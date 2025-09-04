@@ -1,0 +1,111 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Device {
+  id        String        @id @default(cuid())
+  deviceId  String        @unique  // External device identifier
+  name      String
+  location  String
+  latitude  Float?
+  longitude Float?
+  minTemp   Float         @default(2.0)   // Vaccine storage minimum
+  maxTemp   Float         @default(8.0)   // Vaccine storage maximum
+  battery   Float         @default(100.0) // Battery level percentage
+  status    DeviceStatus  @default(ONLINE)
+  isActive  Boolean       @default(true)
+  
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  
+  // Relations
+  readings  Reading[]
+  alerts    Alert[]
+
+  // Indexes for performance
+  @@index([isActive])
+  @@index([status])
+  @@index([location])
+  @@index([deviceId])
+  @@map("devices")
+}
+
+model Reading {
+  id          String        @id @default(cuid())
+  deviceId    String
+  temperature Float
+  battery     Float         @default(100.0)
+  status      ReadingStatus @default(NORMAL)
+  timestamp   DateTime      @default(now())
+  
+  // Relations
+  device      Device        @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  alerts      Alert[]
+
+  // Composite index for time-series queries (most important)
+  @@index([deviceId, timestamp(sort: Desc)])
+  @@index([timestamp(sort: Desc)])
+  @@index([temperature])
+  @@index([status])
+  @@map("readings")
+}
+
+model Alert {
+  id           String        @id @default(cuid())
+  deviceId     String
+  readingId    String?
+  type         AlertType
+  severity     AlertSeverity @default(MEDIUM)
+  message      String
+  temperature  Float?        // The temperature value that triggered the alert
+  threshold    Float?        // The threshold that was exceeded
+  acknowledged Boolean       @default(false)
+  createdAt    DateTime      @default(now())
+  
+  // Relations
+  device       Device        @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  reading      Reading?      @relation(fields: [readingId], references: [id], onDelete: SetNull)
+
+  // Indexes for alert management
+  @@index([deviceId, acknowledged])
+  @@index([type, acknowledged])
+  @@index([createdAt(sort: Desc)])
+  @@index([severity, acknowledged])
+  @@map("alerts")
+}
+
+// - Product, Shipment, ShipmentProduct, TrackingEvent
+
+enum DeviceStatus {
+  ONLINE
+  OFFLINE
+  MAINTENANCE
+}
+
+enum ReadingStatus {
+  NORMAL
+  WARNING
+  CRITICAL
+}
+
+enum AlertType {
+  TEMPERATURE_HIGH
+  TEMPERATURE_LOW
+  BATTERY_LOW
+  DEVICE_OFFLINE
+}
+
+enum AlertSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}

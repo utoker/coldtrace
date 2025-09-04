@@ -1,0 +1,16 @@
+{
+  "extends": "./packages/tsconfig/base.json",
+  "compilerOptions": {
+    "composite": true,
+    "resolvePackageJsonImports": true
+  },
+  "files": [],
+  "references": [
+    { "path": "./packages/database" },
+    { "path": "./packages/env" },
+    { "path": "./packages/types" },
+    { "path": "./apps/frontend" },
+    { "path": "./apps/backend" },
+    { "path": "./apps/simulator" }
+  ]
+}

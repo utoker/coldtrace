@@ -1,0 +1,39 @@
+{
+  "name": "@coldtrace/database",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "dev": "dotenv -e .env -- prisma studio",
+    "build": "tsc && pnpm db:generate",
+    "db:generate": "dotenv -e .env -- prisma generate",
+    "db:push": "dotenv -e .env -- prisma db push",
+    "db:migrate": "dotenv -e .env -- prisma migrate dev --name",
+    "db:migrate:prod": "dotenv -e .env -- prisma migrate deploy",
+    "db:migrate:reset": "dotenv -e .env -- prisma migrate reset",
+    "db:seed": "dotenv -e .env -- tsx src/seed.ts",
+    "db:studio": "dotenv -e .env -- prisma studio",
+    "db:setup": "pnpm db:generate && pnpm db:push && pnpm db:seed",
+    "db:reset": "pnpm db:migrate:reset && pnpm db:seed",
+    "db:status": "dotenv -e .env -- prisma migrate status",
+    "lint": "eslint src --ext .ts",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@coldtrace/env": "workspace:*",
+    "@prisma/client": "^6.15.0",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "@coldtrace/tsconfig": "workspace:*",
+    "@types/node": "^22",
+    "@typescript-eslint/eslint-plugin": "^8.41.0",
+    "@typescript-eslint/parser": "^8.41.0",
+    "dotenv-cli": "^7.4.2",
+    "eslint": "^9.34.0",
+    "prisma": "^6.15.0",
+    "tsx": "^4.17.0",
+    "typescript": "^5.7.2"
+  }
+}

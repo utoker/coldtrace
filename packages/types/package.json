@@ -1,0 +1,25 @@
+{
+  "name": "@coldtrace/types",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "lint": "eslint src --ext .ts",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@coldtrace/database": "workspace:*",
+    "@coldtrace/env": "workspace:*"
+  },
+  "devDependencies": {
+    "@coldtrace/tsconfig": "workspace:*",
+    "@types/node": "^22",
+    "@typescript-eslint/eslint-plugin": "^8.41.0",
+    "@typescript-eslint/parser": "^8.41.0",
+    "eslint": "^9.34.0",
+    "typescript": "^5.7.2"
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "name": "coldtrace",
+  "private": true,
+  "type": "module",
+  "imports": {
+    "#coldtrace/database": "./packages/database/src/index.js",
+    "#coldtrace/types": "./packages/types/src/index.js",
+    "#coldtrace/env": "./packages/env/src/index.js"
+  },
+  "scripts": {
+    "dev": "./scripts/dev.sh",
+    "dev:turbo": "turbo run dev",
+    "dev:stop": "./scripts/cleanup-dev.sh",
+    "dev:force-kill": "./scripts/force-kill-dev.sh",
+    "dev:status": "./scripts/dev-status.sh",
+    "build": "turbo run build",
+    "clean": "turbo run clean",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "kill:dev": "pkill -f 'tsx.*watch' 2>/dev/null || true; pkill -f 'next.*dev' 2>/dev/null || true; pkill -f 'prisma.*studio' 2>/dev/null || true",
+    "kill:zombies": "pkill -9 -f '<defunct>' 2>/dev/null || true",
+    "cleanup": "./scripts/cleanup-dev.sh",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "docker:reset": "docker compose down -v && docker compose up -d",
+    "docker:logs": "docker compose logs -f",
+    "docker:db": "docker compose exec postgres psql -U coldtrace -d coldtrace",
+    "docker:adminer": "echo 'Adminer running at http://localhost:8080' && echo 'Server: postgres | Username: coldtrace | Password: password | Database: coldtrace'",
+    "db:setup": "pnpm docker:up && sleep 5 && pnpm --filter @coldtrace/database db:setup",
+    "db:reset": "pnpm docker:reset && sleep 10 && pnpm --filter @coldtrace/database db:setup",
+    "simulator:demo": "pnpm --filter @coldtrace/simulator dev:demo",
+    "simulator:dev": "pnpm --filter @coldtrace/simulator dev",
+    "simulator:start": "pnpm --filter @coldtrace/simulator start",
+    "simulator:test": "pnpm --filter @coldtrace/simulator test",
+    "simulator:validate": "pnpm --filter @coldtrace/simulator validate"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.34.0",
+    "@turbo/gen": "^2.5.6",
+    "@typescript-eslint/eslint-plugin": "^8.41.0",
+    "@typescript-eslint/parser": "^8.41.0",
+    "eslint": "^9.34.0",
+    "turbo": "^2.5.6",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.41.0"
+  },
+  "packageManager": "pnpm@10.15.1"
+}
