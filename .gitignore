@@ -8,7 +8,7 @@ node_modules/
 *.lcov
 
 # Next.js
-/.next/
+.next/
 /out/
 
 # Production
