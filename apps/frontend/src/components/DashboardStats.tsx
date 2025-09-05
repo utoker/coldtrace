@@ -110,10 +110,6 @@ export function DashboardStats() {
   useSubscription(TEMPERATURE_UPDATES, {
     skip: false, // Always try to connect - this will trigger WebSocket connection
     onData: ({ data }) => {
-      console.log(
-        '🌡️ DashboardStats: Temperature update received via WebSocket:',
-        data
-      );
       // Refetch dashboard stats when temperature updates occur
       refetch();
     },
@@ -129,7 +125,6 @@ export function DashboardStats() {
   useSubscription(NEW_ALERTS, {
     skip: false, // Always try to connect - this will trigger WebSocket connection
     onData: ({ data }) => {
-      console.log('🚨 DashboardStats: New alert received via WebSocket:', data);
       // Refetch dashboard stats when new alerts occur
       refetch();
     },

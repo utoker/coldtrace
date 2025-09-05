@@ -22,12 +22,7 @@ export function WebSocketTest() {
   const { data, error, loading } = useSubscription<PingData>(
     PING_SUBSCRIPTION,
     {
-      onData: ({ data: subscriptionData }) => {
-        console.log(
-          '🔔 WebSocketTest: Received ping:',
-          subscriptionData?.data?.ping
-        );
-      },
+      onData: ({ data: subscriptionData }) => {},
       onError: (error) => {
         console.error('❌ WebSocketTest: Subscription error:', error);
       },
@@ -35,15 +30,7 @@ export function WebSocketTest() {
   );
 
   useEffect(() => {
-    console.log(
-      '🚀 WebSocketTest: Component mounted, forcing WebSocket connection'
-    );
-    console.log('📊 WebSocketTest: Subscription state:', {
-      loading,
-      error: error?.message,
-      data,
-    });
-    console.log('🌐 WebSocketTest: Context state:', wsContext);
+    // WebSocket connection monitoring
   }, [loading, error, data, wsContext]);
 
   const getStatusColor = () => {

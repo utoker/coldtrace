@@ -124,9 +124,9 @@ export function WebSocketDebugger() {
       timestamp: new Date().toLocaleTimeString(),
       type,
       message,
-      deviceName,
-      temperature,
-      status,
+      ...(deviceName !== undefined && { deviceName }),
+      ...(temperature !== undefined && { temperature }),
+      ...(status !== undefined && { status }),
     };
     setUpdates((prev) => [update, ...prev.slice(0, 49)]); // Keep last 50 updates
   };
@@ -135,8 +135,9 @@ export function WebSocketDebugger() {
   useSubscription(TEMPERATURE_UPDATES, {
     skip: false,
     onData: ({ data }) => {
-      if (data?.temperatureUpdates) {
-        const reading = data.temperatureUpdates;
+      const subscriptionData = data?.data as { temperatureUpdates?: any };
+      if (subscriptionData?.temperatureUpdates) {
+        const reading = subscriptionData.temperatureUpdates;
         addUpdate(
           'temperature',
           `Temperature update: ${reading.temperature}°C (${reading.status})`,
@@ -155,8 +156,9 @@ export function WebSocketDebugger() {
   useSubscription(DEVICE_STATUS_CHANGED, {
     skip: false,
     onData: ({ data }) => {
-      if (data?.deviceStatusChanged) {
-        const device = data.deviceStatusChanged;
+      const subscriptionData = data?.data as { deviceStatusChanged?: any };
+      if (subscriptionData?.deviceStatusChanged) {
+        const device = subscriptionData.deviceStatusChanged;
         addUpdate(
           'status',
           `Status changed: ${device.status} (Active: ${device.isActive})`,
@@ -175,9 +177,10 @@ export function WebSocketDebugger() {
   useSubscription(PING_SUBSCRIPTION, {
     skip: false,
     onData: ({ data }) => {
-      if (data?.ping) {
+      const subscriptionData = data?.data as { ping?: any };
+      if (subscriptionData?.ping) {
         setLastPing(new Date());
-        addUpdate('ping', `Ping: ${data.ping}`);
+        addUpdate('ping', `Ping: ${subscriptionData.ping}`);
       }
     },
     onError: (error) => {

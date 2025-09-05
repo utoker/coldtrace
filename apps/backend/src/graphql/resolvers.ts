@@ -1,10 +1,9 @@
 import { GraphQLError } from 'graphql';
 import { GraphQLScalarType, Kind } from 'graphql';
 import { GraphQLContext } from './context';
-import { PubSub } from 'graphql-subscriptions';
 import { PrismaClient } from '@coldtrace/database';
-
-const pubsub = new PubSub();
+import { simulatorService } from '../services/simulatorService';
+import { pubsub } from '../lib/pubsub';
 
 // Helper function to calculate compliance rate
 async function calculateComplianceRate(
@@ -230,13 +229,17 @@ export const resolvers = {
       _parent: unknown,
       args: {
         deviceId: string;
-        startTime: Date;
-        endTime: Date;
+        timeRange: {
+          startTime: Date;
+          endTime: Date;
+        };
         limit?: number;
       },
       { prisma }: GraphQLContext
     ) => {
-      const { deviceId, startTime, endTime, limit = 1000 } = args;
+      const { deviceId, timeRange, limit = 1000 } = args;
+      const { startTime, endTime } = timeRange;
+
       try {
         // Get readings within time range
         const readings = await prisma.reading.findMany({
@@ -274,14 +277,18 @@ export const resolvers = {
             ? `${durationHours} hours`
             : `${Math.round(durationHours / 24)} days`;
 
-        return {
+        const result = {
           deviceId,
           readings,
           totalCount,
-          startTime,
-          endTime,
-          duration,
+          timeRange: {
+            startTime,
+            endTime,
+            duration,
+          },
         };
+
+        return result;
       } catch (error) {
         console.error('Error fetching device history:', error);
         throw new GraphQLError('Failed to fetch device history');
@@ -488,10 +495,6 @@ export const resolvers = {
         }
 
         // Publish temperature update to both general and device-specific channels
-        console.log(
-          '📡 Publishing temperature update to TEMPERATURE_UPDATES channel:',
-          readingWithStatus
-        );
         pubsub.publish('TEMPERATURE_UPDATES', {
           temperatureUpdates: readingWithStatus,
         });
@@ -537,6 +540,70 @@ export const resolvers = {
       } catch (error) {
         console.error('Error acknowledging alert:', error);
         throw new GraphQLError('Failed to acknowledge alert');
+      }
+    },
+
+    // Simulator Controls
+    triggerExcursion: async (_parent: any, args: { deviceId?: string }) => {
+      try {
+        return await simulatorService.triggerExcursion(args.deviceId);
+      } catch (error) {
+        console.error('Error triggering excursion:', error);
+        throw new GraphQLError('Failed to trigger excursion');
+      }
+    },
+
+    simulateLowBattery: async (_parent: any, args: { deviceId?: string }) => {
+      try {
+        return await simulatorService.simulateLowBattery(args.deviceId);
+      } catch (error) {
+        console.error('Error simulating low battery:', error);
+        throw new GraphQLError('Failed to simulate low battery');
+      }
+    },
+
+    takeDeviceOffline: async (_parent: any, args: { deviceId?: string }) => {
+      try {
+        return await simulatorService.takeDeviceOffline(args.deviceId);
+      } catch (error) {
+        console.error('Error taking device offline:', error);
+        throw new GraphQLError('Failed to take device offline');
+      }
+    },
+
+    simulatePowerOutage: async () => {
+      try {
+        return await simulatorService.simulatePowerOutage();
+      } catch (error) {
+        console.error('Error simulating power outage:', error);
+        throw new GraphQLError('Failed to simulate power outage');
+      }
+    },
+
+    simulateBatchArrival: async () => {
+      try {
+        return await simulatorService.simulateBatchArrival();
+      } catch (error) {
+        console.error('Error simulating batch arrival:', error);
+        throw new GraphQLError('Failed to simulate batch arrival');
+      }
+    },
+
+    returnToNormal: async () => {
+      try {
+        return await simulatorService.returnToNormal();
+      } catch (error) {
+        console.error('Error returning to normal:', error);
+        throw new GraphQLError('Failed to return to normal');
+      }
+    },
+
+    getSimulatorStats: async () => {
+      try {
+        return await simulatorService.getSimulatorStats();
+      } catch (error) {
+        console.error('Error getting simulator stats:', error);
+        throw new GraphQLError('Failed to get simulator stats');
       }
     },
   },
@@ -628,6 +695,5 @@ export const resolvers = {
 setInterval(() => {
   const timestamp = new Date().toISOString();
   const message = `Ping at ${timestamp}`;
-  console.log('📡 Publishing ping:', message);
   pubsub.publish('PING', { ping: message });
 }, 5000); // Every 5 seconds

@@ -20,8 +20,7 @@ export const typeDefs = gql`
     getActiveAlerts(deviceId: ID): [Alert!]!
     getDeviceHistory(
       deviceId: ID!
-      startTime: DateTime!
-      endTime: DateTime!
+      timeRange: TimeRangeInput!
       limit: Int = 1000
     ): DeviceHistoryResult!
     getDeviceStats(deviceId: ID!): DeviceStats!
@@ -32,6 +31,15 @@ export const typeDefs = gql`
     updateDevice(id: ID!, input: UpdateDeviceInput!): Device!
     createReading(input: CreateReadingInput!): Reading!
     acknowledgeAlert(id: ID!): Alert!
+
+    # Simulator Controls
+    triggerExcursion(deviceId: ID): SimulatorResult!
+    simulateLowBattery(deviceId: ID): SimulatorResult!
+    takeDeviceOffline(deviceId: ID): SimulatorResult!
+    simulatePowerOutage: SimulatorResult!
+    simulateBatchArrival: SimulatorResult!
+    returnToNormal: SimulatorResult!
+    getSimulatorStats: SimulatorStats!
   }
 
   type Subscription {
@@ -139,10 +147,19 @@ export const typeDefs = gql`
     battery: Float
   }
 
+  input TimeRangeInput {
+    startTime: DateTime!
+    endTime: DateTime!
+  }
+
   type DeviceHistoryResult {
     deviceId: ID!
     readings: [Reading!]!
     totalCount: Int!
+    timeRange: TimeRangeInfo!
+  }
+
+  type TimeRangeInfo {
     startTime: DateTime!
     endTime: DateTime!
     duration: String!
@@ -161,5 +178,23 @@ export const typeDefs = gql`
     max: Float!
     avg: Float!
     current: Float
+  }
+
+  type SimulatorResult {
+    success: Boolean!
+    message: String!
+    affectedDevices: [Device!]!
+  }
+
+  type SimulatorStats {
+    totalReadings: Int!
+    successfulReadings: Int!
+    failedReadings: Int!
+    alertsCreated: Int!
+    runtime: Int!
+    devicesOnline: Int!
+    devicesOffline: Int!
+    devicesInExcursion: Int!
+    lowBatteryDevices: Int!
   }
 `;

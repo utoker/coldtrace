@@ -4,6 +4,7 @@ import { useQuery, useSubscription } from '@apollo/client/react';
 import { gql } from '@apollo/client';
 import { useState, useEffect, useCallback } from 'react';
 import { DeviceCard } from './DeviceCard';
+import { DeviceDetailModal } from './DeviceDetailModal';
 import {
   useDeviceStore,
   useFilteredDevices,
@@ -19,6 +20,8 @@ const GET_DEVICES = gql`
       deviceId
       name
       location
+      latitude
+      longitude
       battery
       status
       isActive
@@ -65,6 +68,8 @@ interface Device {
   deviceId: string;
   name: string;
   location: string;
+  latitude?: number;
+  longitude?: number;
   battery: number;
   status: 'ONLINE' | 'OFFLINE' | 'MAINTENANCE';
   isActive: boolean;
@@ -123,6 +128,8 @@ export function DeviceGrid() {
   const [updatingDevices, setUpdatingDevices] = useState<Set<string>>(
     new Set()
   );
+  const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const [wsConnected, setWsConnected] = useState<boolean>(false);
   const [wsError, setWsError] = useState<string | null>(null);
@@ -133,6 +140,17 @@ export function DeviceGrid() {
   const { setDevices, updateDeviceReading, updateDeviceStatus, setView } =
     useDeviceStore();
   const { addAlert, alerts } = useAlertStore();
+
+  // Modal handlers
+  const handleDeviceClick = useCallback((device: Device) => {
+    setSelectedDevice(device);
+    setIsModalOpen(true);
+  }, []);
+
+  const handleModalClose = useCallback(() => {
+    setIsModalOpen(false);
+    setSelectedDevice(null);
+  }, []);
 
   // Optimized state update function with useCallback
   const updateDeviceWithFlash = useCallback((deviceId: string) => {
@@ -151,11 +169,6 @@ export function DeviceGrid() {
   // Monitor WebSocket connection status with enhanced debugging
   useEffect(() => {
     const handleWSConnected = () => {
-      console.log(
-        '✅ DeviceGrid: WebSocket connected, subscriptions will activate'
-      );
-      console.log('   - Switching to low-frequency polling (10 minutes)');
-      console.log('   - Temperature and device status subscriptions active');
       setWsConnected(true);
       setWsError(null);
     };
@@ -185,16 +198,12 @@ export function DeviceGrid() {
     };
 
     const handleWSConnecting = () => {
-      console.log('🔄 DeviceGrid: WebSocket connecting...');
+      // WebSocket connecting
     };
 
     // Set initial state from window global and log current state
     if (typeof window !== 'undefined') {
       const isConnected = !!window.__GRAPHQL_WS_CONNECTED__;
-      console.log(
-        '🔍 DeviceGrid: Initial WebSocket state:',
-        isConnected ? 'connected' : 'disconnected'
-      );
       setWsConnected(isConnected);
     }
 
@@ -237,7 +246,6 @@ export function DeviceGrid() {
       setDevices(devices);
 
       // Check for low battery alerts on initial load with deduplication
-      console.log('Devices loaded, checking for alerts:', devices.length);
       devices.forEach((device) => {
         // Check for existing battery alert to prevent duplicates
         const existingBatteryAlert = alerts.find(
@@ -252,12 +260,6 @@ export function DeviceGrid() {
           device.battery <= 20 &&
           device.status === 'ONLINE'
         ) {
-          console.log(
-            'Generating battery alert for device:',
-            device.name,
-            'Battery:',
-            device.battery
-          );
           addAlert({
             deviceId: device.id,
             deviceName: device.name,
@@ -294,29 +296,10 @@ export function DeviceGrid() {
     }
   }, [data, setDevices, addAlert, alerts]);
 
-  // Log subscription status changes
-  useEffect(() => {
-    if (wsConnected) {
-      console.log('🔔 DeviceGrid: Subscriptions ACTIVATED');
-      console.log('   - temperatureUpdates subscription: ACTIVE');
-      console.log('   - deviceStatusChanged subscription: ACTIVE');
-      console.log('   - HTTP polling reduced to 10 minutes');
-    } else {
-      console.log('⏸️ DeviceGrid: Subscriptions SKIPPED');
-      console.log('   - temperatureUpdates subscription: SKIPPED');
-      console.log('   - deviceStatusChanged subscription: SKIPPED');
-      console.log('   - HTTP polling increased to 30 seconds');
-    }
-  }, [wsConnected]);
-
   // Subscribe to temperature updates - always attempt connection to establish WebSocket
   useSubscription(TEMPERATURE_UPDATES, {
     skip: false, // Always try to connect - this will trigger WebSocket connection
     onData: ({ data: subscriptionData }) => {
-      console.log(
-        '🌡️ DeviceGrid: Temperature update received via WebSocket:',
-        subscriptionData
-      );
       if (
         (subscriptionData as unknown as TemperatureUpdatesData)
           ?.temperatureUpdates
@@ -334,18 +317,8 @@ export function DeviceGrid() {
 
         // Generate alerts based on temperature reading with null safety
         const device = filteredDevices.find((d) => d.id === deviceId);
-        console.log('Temperature update received:', {
-          deviceId,
-          reading,
-          device: device?.name,
-        });
 
         if (device && reading.status !== 'NORMAL') {
-          console.log('Generating alert for temperature violation:', {
-            device: device.name,
-            temperature: reading.temperature,
-            status: reading.status,
-          });
           const severity =
             reading.status === 'CRITICAL' ? 'CRITICAL' : 'WARNING';
           let message = '';
@@ -642,6 +615,7 @@ export function DeviceGrid() {
               key={device.id}
               device={device}
               isUpdating={updatingDevices.has(device.id)}
+              onClick={() => handleDeviceClick(device)}
             />
           ))}
         </div>
@@ -655,6 +629,7 @@ export function DeviceGrid() {
               <DeviceCard
                 device={device}
                 isUpdating={updatingDevices.has(device.id)}
+                onClick={() => handleDeviceClick(device)}
               />
             </div>
           ))}
@@ -680,6 +655,13 @@ export function DeviceGrid() {
           </button>
         </div>
       )}
+
+      {/* Device Detail Modal */}
+      <DeviceDetailModal
+        device={selectedDevice}
+        isOpen={isModalOpen}
+        onClose={handleModalClose}
+      />
     </div>
   );
 }
