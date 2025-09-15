@@ -14,7 +14,6 @@
     "rootDir": "./src",
     "composite": true,
     "incremental": true,
-    "tsBuildInfoFile": "./dist/.tsbuildinfo",
     "removeComments": false,
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,

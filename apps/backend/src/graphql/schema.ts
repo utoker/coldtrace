@@ -17,7 +17,6 @@ export const typeDefs = gql`
       endTime: DateTime
       limit: Int = 100
     ): [Reading!]!
-    getActiveAlerts(deviceId: ID): [Alert!]!
     getDeviceHistory(
       deviceId: ID!
       timeRange: TimeRangeInput!
@@ -30,7 +29,6 @@ export const typeDefs = gql`
     createDevice(input: CreateDeviceInput!): Device!
     updateDevice(id: ID!, input: UpdateDeviceInput!): Device!
     createReading(input: CreateReadingInput!): Reading!
-    acknowledgeAlert(id: ID!): Alert!
 
     # Simulator Controls
     triggerExcursion(deviceId: ID): SimulatorResult!
@@ -44,7 +42,6 @@ export const typeDefs = gql`
 
   type Subscription {
     temperatureUpdates(deviceId: ID): Reading!
-    newAlerts: Alert!
     deviceStatusChanged: Device!
     ping: String!
   }
@@ -66,7 +63,6 @@ export const typeDefs = gql`
     createdAt: DateTime!
     updatedAt: DateTime!
     readings: [Reading!]!
-    alerts: [Alert!]!
     latestReading: Reading
   }
 
@@ -77,20 +73,6 @@ export const typeDefs = gql`
     battery: Float
     status: ReadingStatus!
     timestamp: DateTime!
-    device: Device!
-    alerts: [Alert!]!
-  }
-
-  type Alert {
-    id: ID!
-    deviceId: ID!
-    type: AlertType!
-    severity: AlertSeverity!
-    message: String!
-    temperature: Float
-    threshold: Float
-    acknowledged: Boolean!
-    createdAt: DateTime!
     device: Device!
   }
 
@@ -103,20 +85,6 @@ export const typeDefs = gql`
   enum ReadingStatus {
     NORMAL
     WARNING
-    CRITICAL
-  }
-
-  enum AlertType {
-    TEMPERATURE_HIGH
-    TEMPERATURE_LOW
-    BATTERY_LOW
-    DEVICE_OFFLINE
-  }
-
-  enum AlertSeverity {
-    LOW
-    MEDIUM
-    HIGH
     CRITICAL
   }
 

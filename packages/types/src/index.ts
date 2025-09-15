@@ -2,15 +2,10 @@
 export type {
   Device,
   Reading,
-  Alert,
   DeviceStatus,
   ReadingStatus,
-  AlertType,
-  AlertSeverity,
   DeviceWithReadings,
-  DeviceWithAlertsAndReadings,
   ReadingWithDevice,
-  AlertWithDevice,
 } from '@coldtrace/database';
 
 // Enhanced API interfaces for frontend/backend communication
@@ -19,8 +14,6 @@ export interface DeviceStats {
   activeDevices: number;
   offlineDevices: number;
   totalReadings: number;
-  activeAlerts: number;
-  criticalAlerts: number;
 }
 
 export interface TemperatureStats {
@@ -45,7 +38,6 @@ export interface DeviceLocationData {
     status: string;
     timestamp: Date;
   };
-  alertCount: number;
 }
 
 // API Request/Response types
@@ -71,25 +63,6 @@ export interface CreateReadingInput {
   battery?: number;
 }
 
-export interface CreateAlertInput {
-  deviceId: string;
-  readingId?: string;
-  type: string;
-  severity: string;
-  message: string;
-  temperature?: number;
-  threshold?: number;
-}
-
-export interface AlertFilters {
-  deviceId?: string;
-  type?: string;
-  severity?: string;
-  acknowledged?: boolean;
-  startDate?: Date;
-  endDate?: Date;
-}
-
 export interface ReadingFilters {
   deviceId?: string;
   startDate?: Date;
@@ -102,7 +75,6 @@ export interface DeviceFilters {
   status?: string;
   location?: string;
   isActive?: boolean;
-  hasAlerts?: boolean;
 }
 
 // WebSocket/Real-time types
@@ -117,27 +89,9 @@ export interface RealtimeReading {
   };
 }
 
-export interface RealtimeAlert {
-  id: string;
-  deviceId: string;
-  deviceName: string;
-  type: string;
-  severity: string;
-  message: string;
-  timestamp: Date;
-}
-
 // Dashboard/Analytics types
 export interface DashboardData {
   stats: DeviceStats;
-  recentAlerts: Array<{
-    id: string;
-    deviceName: string;
-    type: string;
-    severity: string;
-    message: string;
-    createdAt: Date;
-  }>;
   recentReadings: Array<{
     deviceId: string;
     deviceName: string;
@@ -165,7 +119,6 @@ export interface DeviceAnalytics {
   };
   temperatureStats: TemperatureStats;
   readingCount: number;
-  alertCount: number;
   uptimePercentage: number;
   timeSeries: TimeSeriesData[];
 }
@@ -216,4 +169,10 @@ export type DeepPartial<T> = {
 };
 
 // Export environment validation for convenience
-export { validateEnvironment, env, isDevelopment, isProduction, isTest } from '@coldtrace/env';
+export {
+  validateEnvironment,
+  env,
+  isDevelopment,
+  isProduction,
+  isTest,
+} from '@coldtrace/env';

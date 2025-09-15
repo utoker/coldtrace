@@ -115,10 +115,6 @@ export const resolvers = {
               take: 1,
               orderBy: { timestamp: 'desc' },
             },
-            alerts: {
-              where: { acknowledged: false },
-              orderBy: { createdAt: 'desc' },
-            },
           },
         });
       } catch (error) {
@@ -140,10 +136,6 @@ export const resolvers = {
             readings: {
               take: 10,
               orderBy: { timestamp: 'desc' },
-            },
-            alerts: {
-              where: { acknowledged: false },
-              orderBy: { createdAt: 'desc' },
             },
           },
         });
@@ -190,38 +182,11 @@ export const resolvers = {
           orderBy: { timestamp: 'desc' },
           include: {
             device: true,
-            alerts: true,
           },
         });
       } catch (error) {
         console.error('Error fetching device readings:', error);
         throw new GraphQLError('Failed to fetch device readings');
-      }
-    },
-
-    getActiveAlerts: async (
-      _parent: unknown,
-      args: { deviceId?: string },
-      { prisma }: GraphQLContext
-    ) => {
-      const { deviceId } = args;
-      try {
-        const where: Record<string, unknown> = {
-          acknowledged: false, // Only unacknowledged alerts
-        };
-        if (deviceId) where.deviceId = deviceId;
-
-        return await prisma.alert.findMany({
-          where,
-          orderBy: { createdAt: 'desc' },
-          include: {
-            device: true,
-            reading: true,
-          },
-        });
-      } catch (error) {
-        console.error('Error fetching active alerts:', error);
-        throw new GraphQLError('Failed to fetch active alerts');
       }
     },
 
@@ -254,7 +219,6 @@ export const resolvers = {
           orderBy: { timestamp: 'desc' },
           include: {
             device: true,
-            alerts: true,
           },
         });
 
@@ -317,7 +281,6 @@ export const resolvers = {
           orderBy: { timestamp: 'desc' },
           include: {
             device: true,
-            alerts: true,
           },
         });
 
@@ -363,7 +326,6 @@ export const resolvers = {
           data: input,
           include: {
             readings: true,
-            alerts: true,
           },
         });
       } catch (error) {
@@ -391,7 +353,6 @@ export const resolvers = {
           data: updateData,
           include: {
             readings: true,
-            alerts: true,
           },
         });
       } catch (error) {
@@ -441,59 +402,6 @@ export const resolvers = {
           status,
         };
 
-        // Check for alerts and create them
-        if (device.minTemp && input.temperature < device.minTemp) {
-          const alert = await prisma.alert.create({
-            data: {
-              deviceId: input.deviceId,
-              readingId: reading.id,
-              type: 'TEMPERATURE_LOW',
-              severity:
-                input.temperature < device.minTemp - 2 ? 'CRITICAL' : 'HIGH',
-              message: `Low Temperature Alert - ${device.name}: Temperature ${input.temperature}°C below minimum threshold of ${device.minTemp}°C`,
-              temperature: input.temperature,
-              threshold: device.minTemp,
-            },
-            include: { device: true },
-          });
-
-          pubsub.publish('NEW_ALERTS', { newAlerts: alert });
-        }
-
-        if (device.maxTemp && input.temperature > device.maxTemp) {
-          const alert = await prisma.alert.create({
-            data: {
-              deviceId: input.deviceId,
-              readingId: reading.id,
-              type: 'TEMPERATURE_HIGH',
-              severity:
-                input.temperature > device.maxTemp + 2 ? 'CRITICAL' : 'HIGH',
-              message: `High Temperature Alert - ${device.name}: Temperature ${input.temperature}°C exceeds maximum threshold of ${device.maxTemp}°C`,
-              temperature: input.temperature,
-              threshold: device.maxTemp,
-            },
-            include: { device: true },
-          });
-
-          pubsub.publish('NEW_ALERTS', { newAlerts: alert });
-        }
-
-        if (input.battery && input.battery < 20) {
-          const alert = await prisma.alert.create({
-            data: {
-              deviceId: input.deviceId,
-              type: 'BATTERY_LOW',
-              severity: 'MEDIUM',
-              message: `Low Battery - ${device.name}: Battery level at ${input.battery}%`,
-              temperature: null,
-              threshold: 20,
-            },
-            include: { device: true },
-          });
-
-          pubsub.publish('NEW_ALERTS', { newAlerts: alert });
-        }
-
         // Publish temperature update to both general and device-specific channels
         pubsub.publish('TEMPERATURE_UPDATES', {
           temperatureUpdates: readingWithStatus,
@@ -516,30 +424,6 @@ export const resolvers = {
           throw error;
         }
         throw new GraphQLError('Failed to create reading');
-      }
-    },
-
-    acknowledgeAlert: async (
-      _parent: any,
-      args: any,
-      { prisma }: GraphQLContext
-    ) => {
-      const { id } = args;
-      try {
-        const alert = await prisma.alert.update({
-          where: { id },
-          data: {
-            acknowledged: true,
-          },
-          include: {
-            device: true,
-          },
-        });
-
-        return alert;
-      } catch (error) {
-        console.error('Error acknowledging alert:', error);
-        throw new GraphQLError('Failed to acknowledge alert');
       }
     },
 
@@ -622,13 +506,6 @@ export const resolvers = {
       },
     },
 
-    newAlerts: {
-      subscribe: () => {
-        console.log('🔔 Setting up newAlerts subscription');
-        return pubsub.asyncIterableIterator(['NEW_ALERTS']);
-      },
-    },
-
     deviceStatusChanged: {
       subscribe: () => {
         console.log('🔔 Setting up deviceStatusChanged subscription');
@@ -679,15 +556,6 @@ export const resolvers = {
         device?.maxTemp
       );
     },
-  },
-
-  Alert: {
-    device: async (parent: any, _args: any, { prisma }: GraphQLContext) => {
-      return await prisma.device.findUnique({
-        where: { id: parent.deviceId },
-      });
-    },
-    // The Alert model now has these fields directly, no need for field resolvers
   },
 };
 

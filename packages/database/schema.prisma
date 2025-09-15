@@ -28,7 +28,6 @@ model Device {
   
   // Relations
   readings  Reading[]
-  alerts    Alert[]
 
   // Indexes for performance
   @@index([isActive])
@@ -48,7 +47,6 @@ model Reading {
   
   // Relations
   device      Device        @relation(fields: [deviceId], references: [id], onDelete: Cascade)
-  alerts      Alert[]
 
   // Composite index for time-series queries (most important)
   @@index([deviceId, timestamp(sort: Desc)])
@@ -58,29 +56,6 @@ model Reading {
   @@map("readings")
 }
 
-model Alert {
-  id           String        @id @default(cuid())
-  deviceId     String
-  readingId    String?
-  type         AlertType
-  severity     AlertSeverity @default(MEDIUM)
-  message      String
-  temperature  Float?        // The temperature value that triggered the alert
-  threshold    Float?        // The threshold that was exceeded
-  acknowledged Boolean       @default(false)
-  createdAt    DateTime      @default(now())
-  
-  // Relations
-  device       Device        @relation(fields: [deviceId], references: [id], onDelete: Cascade)
-  reading      Reading?      @relation(fields: [readingId], references: [id], onDelete: SetNull)
-
-  // Indexes for alert management
-  @@index([deviceId, acknowledged])
-  @@index([type, acknowledged])
-  @@index([createdAt(sort: Desc)])
-  @@index([severity, acknowledged])
-  @@map("alerts")
-}
 
 // - Product, Shipment, ShipmentProduct, TrackingEvent
 
@@ -93,19 +68,5 @@ enum DeviceStatus {
 enum ReadingStatus {
   NORMAL
   WARNING
-  CRITICAL
-}
-
-enum AlertType {
-  TEMPERATURE_HIGH
-  TEMPERATURE_LOW
-  BATTERY_LOW
-  DEVICE_OFFLINE
-}
-
-enum AlertSeverity {
-  LOW
-  MEDIUM
-  HIGH
   CRITICAL
 }

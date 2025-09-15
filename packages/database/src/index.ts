@@ -1,15 +1,20 @@
 // Load and validate environment variables first
 import './env';
 
-import { PrismaClient, Device, Reading, Alert, AlertSeverity } from '@prisma/client';
+import { PrismaClient, Device, Reading } from '@prisma/client';
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
 
-export const prisma = globalForPrisma.prisma ?? new PrismaClient({
-  log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
-});
+export const prisma =
+  globalForPrisma.prisma ??
+  new PrismaClient({
+    log:
+      process.env.NODE_ENV === 'development'
+        ? ['error', 'warn'] // Removed 'query' to reduce console noise
+        : ['error'],
+  });
 
 if (process.env.NODE_ENV !== 'production') {
   globalForPrisma.prisma = prisma;
@@ -24,16 +29,7 @@ export type DeviceWithReadings = Device & {
   readings: Reading[];
 };
 
-export type DeviceWithAlertsAndReadings = Device & {
-  readings: Reading[];
-  alerts: Alert[];
-};
-
 export type ReadingWithDevice = Reading & {
-  device: Device;
-};
-
-export type AlertWithDevice = Alert & {
   device: Device;
 };
 
@@ -48,13 +44,6 @@ export const db = {
           orderBy: { timestamp: 'desc' },
           take: 1, // Latest reading only
         },
-        _count: {
-          select: {
-            alerts: {
-              where: { acknowledged: false }
-            }
-          }
-        }
       },
     });
   },
@@ -66,10 +55,6 @@ export const db = {
         readings: {
           orderBy: { timestamp: 'desc' },
           take: 10, // Last 10 readings
-        },
-        alerts: {
-          where: { acknowledged: false },
-          orderBy: { createdAt: 'desc' },
         },
       },
     });
@@ -85,7 +70,11 @@ export const db = {
     });
   },
 
-  async getReadingsInTimeRange(deviceId: string, startTime: Date, endTime: Date) {
+  async getReadingsInTimeRange(
+    deviceId: string,
+    startTime: Date,
+    endTime: Date
+  ) {
     return prisma.reading.findMany({
       where: {
         deviceId,
@@ -98,73 +87,25 @@ export const db = {
     });
   },
 
-  // Alert utilities
-  async getActiveAlerts(deviceId?: string) {
-    return prisma.alert.findMany({
-      where: {
-        acknowledged: false,
-        ...(deviceId && { deviceId }),
-      },
-      include: { device: true },
-      orderBy: [
-        { severity: 'desc' }, // Critical first
-        { createdAt: 'desc' },
-      ],
-    });
-  },
-
-  async acknowledgeAlert(alertId: string) {
-    return prisma.alert.update({
-      where: { id: alertId },
-      data: {
-        acknowledged: true,
-      },
-    });
-  },
-
-  async resolveAlert(alertId: string) {
-    return prisma.alert.update({
-      where: { id: alertId },
-      data: {
-        acknowledged: true,
-      },
-    });
-  },
-
   // Analytics utilities
   async getDeviceStats() {
-    const [
-      totalDevices,
-      activeDevices,
-      totalReadings,
-      activeAlerts,
-      criticalAlerts,
-    ] = await Promise.all([
+    const [totalDevices, activeDevices, totalReadings] = await Promise.all([
       prisma.device.count(),
       prisma.device.count({ where: { isActive: true } }),
       prisma.reading.count(),
-      prisma.alert.count({ where: { acknowledged: false } }),
-      prisma.alert.count({ 
-        where: { 
-          acknowledged: false, 
-          severity: AlertSeverity.CRITICAL 
-        } 
-      }),
     ]);
 
     return {
       totalDevices,
       activeDevices,
       totalReadings,
-      activeAlerts,
-      criticalAlerts,
       offlineDevices: totalDevices - activeDevices,
     };
   },
 
   async getTemperatureStats(deviceId: string, hours = 24) {
     const startTime = new Date(Date.now() - hours * 60 * 60 * 1000);
-    
+
     const readings = await prisma.reading.findMany({
       where: {
         deviceId,
@@ -175,7 +116,7 @@ export const db = {
 
     if (readings.length === 0) return null;
 
-    const temperatures = readings.map(r => r.temperature);
+    const temperatures = readings.map((r) => r.temperature);
     return {
       min: Math.min(...temperatures),
       max: Math.max(...temperatures),

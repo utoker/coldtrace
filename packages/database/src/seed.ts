@@ -1,4 +1,4 @@
-import { prisma, DeviceStatus, AlertType, AlertSeverity, ReadingStatus } from './index';
+import { prisma, DeviceStatus, ReadingStatus } from './index';
 
 async function seed() {
   console.log('💉 Seeding ColdTrace Vaccine Monitoring System...');
@@ -53,7 +53,7 @@ async function seed() {
       deviceId: 'WAL-VAC-005',
       name: 'Pharmacy Unit E',
       location: 'Walgreens - Westshore Plaza',
-      latitude: 27.8930,
+      latitude: 27.893,
       longitude: -82.5131,
       minTemp: 2.0,
       maxTemp: 8.0,
@@ -128,22 +128,25 @@ async function seed() {
   // Create initial readings for each device
   console.log('📊 Creating initial sensor readings...');
   const readings = [];
-  const alerts = [];
 
   for (const device of createdDevices) {
     // Generate 7 days of historical readings for each device (every 2 hours)
-    for (let i = 0; i < 84; i++) { // 7 days * 12 readings per day
-      const timestamp = new Date(Date.now() - (i * 2 * 60 * 60 * 1000)); // 2 hours apart
-      
+    for (let i = 0; i < 84; i++) {
+      // 7 days * 12 readings per day
+      const timestamp = new Date(Date.now() - i * 2 * 60 * 60 * 1000); // 2 hours apart
+
       // Vaccine storage temperature (2-8°C) with some variation
       const baseTemp = 5.0; // Middle of vaccine range
       const tempVariation = (Math.random() - 0.5) * 3; // ±1.5°C variation
       const temperature = baseTemp + tempVariation;
-      
+
       // Battery level with gradual drain
       const batteryDrain = i * 0.1; // Gradual battery decrease
-      const battery = Math.max(15, device.battery - batteryDrain + (Math.random() * 2));
-      
+      const battery = Math.max(
+        15,
+        device.battery - batteryDrain + Math.random() * 2
+      );
+
       // Determine reading status based on temperature
       const getReadingStatus = (temp: number): ReadingStatus => {
         if (temp < 1 || temp > 9) return ReadingStatus.CRITICAL;
@@ -158,46 +161,6 @@ async function seed() {
         status: getReadingStatus(temperature),
         timestamp,
       });
-
-      // Create alerts for temperature threshold violations
-      if (temperature > device.maxTemp) {
-        alerts.push({
-          deviceId: device.id,
-          type: AlertType.TEMPERATURE_HIGH,
-          severity: temperature > (device.maxTemp + 2) ? AlertSeverity.CRITICAL : AlertSeverity.HIGH,
-          message: `High Temperature Alert - ${device.name}: ${temperature.toFixed(1)}°C exceeds maximum threshold of ${device.maxTemp}°C`,
-          temperature: temperature,
-          threshold: device.maxTemp,
-          acknowledged: false,
-          createdAt: timestamp,
-        });
-      }
-
-      if (temperature < device.minTemp) {
-        alerts.push({
-          deviceId: device.id,
-          type: AlertType.TEMPERATURE_LOW,
-          severity: temperature < (device.minTemp - 2) ? AlertSeverity.CRITICAL : AlertSeverity.HIGH,
-          message: `Low Temperature Alert - ${device.name}: ${temperature.toFixed(1)}°C below minimum threshold of ${device.minTemp}°C`,
-          temperature: temperature,
-          threshold: device.minTemp,
-          acknowledged: false,
-          createdAt: timestamp,
-        });
-      }
-
-      if (battery < 20) {
-        alerts.push({
-          deviceId: device.id,
-          type: AlertType.BATTERY_LOW,
-          severity: AlertSeverity.MEDIUM,
-          message: `Low Battery - ${device.name}: Battery level at ${battery.toFixed(1)}%`,
-          temperature: null,
-          threshold: 20,
-          acknowledged: false,
-          createdAt: timestamp,
-        });
-      }
     }
   }
 
@@ -205,25 +168,26 @@ async function seed() {
     data: readings,
   });
 
-  if (alerts.length > 0) {
-    await prisma.alert.createMany({
-      data: alerts,
-    });
-    console.log(`⚠️  Created ${alerts.length} alerts based on sensor data`);
-  }
+  console.log(
+    `📈 Created ${readings.length} temperature readings across 7 days`
+  );
+  console.log('✅ Vaccine monitoring system seeded successfully!');
 
-  console.log(`📈 Created ${readings.length} temperature readings across 7 days`);
-  console.log('✅ Vaccine monitoring system seeded successfully!')
-  
   // Display summary
   console.log('\n📋 Vaccine Cold-Chain Monitoring Summary:');
-  console.log(`   💉 Vaccine Storage Devices: ${createdDevices.length} (Tampa Bay Area)`);
-  console.log(`   📊 Temperature Readings: ${readings.length} (7 days history)`);
-  console.log(`   ⚠️  Temperature Alerts: ${alerts.length}`);
+  console.log(
+    `   💉 Vaccine Storage Devices: ${createdDevices.length} (Tampa Bay Area)`
+  );
+  console.log(
+    `   📊 Temperature Readings: ${readings.length} (7 days history)`
+  );
+  console.log(``);
   console.log(`   🌡️  Temperature Range: 2-8°C (vaccine storage)`);
   console.log(`   🔋 Battery Monitoring: Enabled`);
   console.log('\n🌐 Access your data:');
-  console.log('   📱 Prisma Studio: pnpm --filter @coldtrace/database db:studio');
+  console.log(
+    '   📱 Prisma Studio: pnpm --filter @coldtrace/database db:studio'
+  );
   console.log('   🗄️  GraphQL Playground: http://localhost:4000/graphql');
 }
 

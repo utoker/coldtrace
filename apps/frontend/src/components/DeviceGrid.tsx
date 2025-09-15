@@ -10,7 +10,6 @@ import {
   useFilteredDevices,
   useDeviceView,
 } from '@/store/useDeviceStore';
-import { useAlertStore } from '@/store/useAlertStore';
 
 // GraphQL Queries
 const GET_DEVICES = gql`
@@ -108,13 +107,6 @@ interface GetDevicesData {
   getDevices: Device[];
 }
 
-// Proper WebSocket event types
-type WebSocketEvent = CustomEvent<{
-  message?: string;
-  code?: number;
-  wasClean?: boolean;
-}>;
-
 // Proper error types for Apollo Client
 interface ApolloError {
   name: string;
@@ -131,15 +123,14 @@ export function DeviceGrid() {
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
-  const [wsConnected, setWsConnected] = useState<boolean>(false);
-  const [wsError, setWsError] = useState<string | null>(null);
+  const [wsConnected, setWsConnected] = useState(false);
+  const [subscriptionErrors, setSubscriptionErrors] = useState<number>(0);
 
   // Zustand stores
   const filteredDevices = useFilteredDevices();
   const view = useDeviceView();
   const { setDevices, updateDeviceReading, updateDeviceStatus, setView } =
     useDeviceStore();
-  const { addAlert, alerts } = useAlertStore();
 
   // Modal handlers
   const handleDeviceClick = useCallback((device: Device) => {
@@ -166,135 +157,54 @@ export function DeviceGrid() {
     }, 2000);
   }, []);
 
-  // Monitor WebSocket connection status with enhanced debugging
+  // WebSocket connection monitoring
   useEffect(() => {
     const handleWSConnected = () => {
+      console.log('✅ DeviceGrid: WebSocket connected');
       setWsConnected(true);
-      setWsError(null);
+      setSubscriptionErrors(0);
     };
 
-    const handleWSError = (event: WebSocketEvent) => {
-      console.error(
-        '❌ DeviceGrid: WebSocket error, falling back to HTTP polling'
-      );
-      console.error('   - Error details:', event.detail);
-      console.error('   - Switching to high-frequency polling (30 seconds)');
+    const handleWSError = () => {
+      console.log('❌ DeviceGrid: WebSocket error detected');
       setWsConnected(false);
-      setWsError(event.detail?.message || 'WebSocket connection failed');
     };
 
-    const handleWSClosed = (event: WebSocketEvent) => {
-      const closeEvent = event.detail;
-      console.warn(
-        '🔌 DeviceGrid: WebSocket closed, falling back to HTTP polling'
-      );
-      console.warn('   - Close code:', closeEvent?.code);
-      console.warn('   - Was clean:', closeEvent?.wasClean);
-      console.warn('   - Switching to high-frequency polling (30 seconds)');
+    const handleWSClosed = () => {
+      console.log('🔌 DeviceGrid: WebSocket connection closed');
       setWsConnected(false);
-      if (closeEvent && !closeEvent.wasClean) {
-        setWsError(`Connection lost (Code: ${closeEvent.code})`);
-      }
     };
 
-    const handleWSConnecting = () => {
-      // WebSocket connecting
-    };
-
-    // Set initial state from window global and log current state
-    if (typeof window !== 'undefined') {
-      const isConnected = !!window.__GRAPHQL_WS_CONNECTED__;
-      setWsConnected(isConnected);
-    }
-
-    // Listen for connection events
+    // Listen for custom WebSocket events
     window.addEventListener('graphql-ws-connected', handleWSConnected);
-    window.addEventListener('graphql-ws-error', handleWSError as EventListener);
-    window.addEventListener(
-      'graphql-ws-closed',
-      handleWSClosed as EventListener
-    );
-    window.addEventListener('graphql-ws-connecting', handleWSConnecting);
+    window.addEventListener('graphql-ws-error', handleWSError);
+    window.addEventListener('graphql-ws-closed', handleWSClosed);
 
     return () => {
       window.removeEventListener('graphql-ws-connected', handleWSConnected);
-      window.removeEventListener(
-        'graphql-ws-error',
-        handleWSError as EventListener
-      );
-      window.removeEventListener(
-        'graphql-ws-closed',
-        handleWSClosed as EventListener
-      );
-      window.removeEventListener('graphql-ws-connecting', handleWSConnecting);
+      window.removeEventListener('graphql-ws-error', handleWSError);
+      window.removeEventListener('graphql-ws-closed', handleWSClosed);
     };
   }, []);
 
-  // Query for devices with much less frequent polling when WebSocket is connected
+  // Query for devices with conditional polling - only poll when WebSocket is down
   const { loading, error, data, refetch } = useQuery(GET_DEVICES, {
     variables: { limit: 20 },
-    // Much less frequent polling when WebSocket is working
-    pollInterval: wsConnected ? 600000 : 30000, // 10 min when WS connected, 30 sec when not
+    pollInterval: wsConnected
+      ? 0
+      : Math.min(60000, 30000 + subscriptionErrors * 10000), // No polling when WS connected, exponential backoff when not
     errorPolicy: 'all',
     notifyOnNetworkStatusChange: true,
   });
 
-  // Sync GraphQL data with Zustand store and check for battery alerts with deduplication
+  // Sync GraphQL data with Zustand store
   useEffect(() => {
     if ((data as GetDevicesData)?.getDevices) {
       const devices = (data as GetDevicesData).getDevices;
       setDevices(devices);
-
-      // Check for low battery alerts on initial load with deduplication
-      devices.forEach((device) => {
-        // Check for existing battery alert to prevent duplicates
-        const existingBatteryAlert = alerts.find(
-          (alert) =>
-            alert.deviceId === device.id &&
-            alert.type === 'BATTERY' &&
-            !alert.acknowledged
-        );
-
-        if (
-          !existingBatteryAlert &&
-          device.battery <= 20 &&
-          device.status === 'ONLINE'
-        ) {
-          addAlert({
-            deviceId: device.id,
-            deviceName: device.name,
-            location: device.location,
-            severity: device.battery <= 10 ? 'CRITICAL' : 'WARNING',
-            type: 'BATTERY',
-            message: `Battery low: ${device.battery}%`,
-            details: `Device battery level is ${device.battery}%. Consider replacing or recharging soon.`,
-            timestamp: new Date().toISOString(),
-          });
-        }
-
-        // Check for offline device alerts with deduplication
-        const existingConnectionAlert = alerts.find(
-          (alert) =>
-            alert.deviceId === device.id &&
-            alert.type === 'CONNECTION' &&
-            !alert.acknowledged
-        );
-
-        if (!existingConnectionAlert && device.status === 'OFFLINE') {
-          addAlert({
-            deviceId: device.id,
-            deviceName: device.name,
-            location: device.location,
-            severity: 'WARNING',
-            type: 'CONNECTION',
-            message: 'Device offline',
-            details: 'Device has lost connection and is not reporting data.',
-            timestamp: new Date().toISOString(),
-          });
-        }
-      });
+      setLastUpdate(new Date()); // Update timestamp when new data is loaded
     }
-  }, [data, setDevices, addAlert, alerts]);
+  }, [data, setDevices]);
 
   // Subscribe to temperature updates - always attempt connection to establish WebSocket
   useSubscription(TEMPERATURE_UPDATES, {
@@ -308,6 +218,15 @@ export function DeviceGrid() {
           .temperatureUpdates;
         const deviceId = reading.device.id;
 
+        // Mark WebSocket as working when we receive data
+        if (!wsConnected) {
+          console.log(
+            '✅ DeviceGrid: WebSocket working - received temperature update'
+          );
+          setWsConnected(true);
+          setSubscriptionErrors(0);
+        }
+
         // Update store with new reading
         updateDeviceReading(deviceId, {
           temperature: reading.temperature,
@@ -315,70 +234,18 @@ export function DeviceGrid() {
           timestamp: reading.timestamp,
         });
 
-        // Generate alerts based on temperature reading with null safety
-        const device = filteredDevices.find((d) => d.id === deviceId);
-
-        if (device && reading.status !== 'NORMAL') {
-          const severity =
-            reading.status === 'CRITICAL' ? 'CRITICAL' : 'WARNING';
-          let message = '';
-          let details = '';
-
-          if (reading.temperature < 2) {
-            message = `Temperature too low: ${reading.temperature.toFixed(
-              1
-            )}°C`;
-            details = 'Temperature has dropped below the safe minimum of 2°C';
-          } else if (reading.temperature > 8) {
-            message = `Temperature too high: ${reading.temperature.toFixed(
-              1
-            )}°C`;
-            details = 'Temperature has exceeded the safe maximum of 8°C';
-          } else {
-            message = `Temperature warning: ${reading.temperature.toFixed(
-              1
-            )}°C`;
-            details = 'Temperature is approaching critical thresholds';
-          }
-
-          addAlert({
-            deviceId: device.id,
-            deviceName: device.name,
-            location: device.location,
-            severity,
-            type: 'TEMPERATURE',
-            message,
-            details,
-            timestamp: reading.timestamp,
-          });
-        }
-
         // Flash the updated device using optimized function
         updateDeviceWithFlash(deviceId);
       }
     },
     onError: (error: ApolloError) => {
       console.error('❌ DeviceGrid: Temperature subscription error:', error);
-      console.error('   - This indicates WebSocket subscription is failing');
-      console.error('   - Error name:', error.name);
-      console.error('   - Error message:', error.message);
-      console.error('   - Error stack:', error.stack);
-      console.error('   - GraphQL errors:', error.graphQLErrors);
-      console.error('   - Network error:', error.networkError);
-      console.error('   - Will rely on HTTP polling for updates');
-
-      // Improved error handling with specific error types
-      if (error.networkError) {
-        setWsError('Network connection failed');
-      } else if (error.graphQLErrors && error.graphQLErrors.length > 0) {
-        setWsError(
-          `GraphQL error: ${
-            error.graphQLErrors[0]?.message || 'Unknown GraphQL error'
-          }`
-        );
-      } else {
-        setWsError(`Temperature subscription error: ${error.message}`);
-      }
+      setWsConnected(false);
+      setSubscriptionErrors((prev) => prev + 1);
+      console.error(
+        '   - WebSocket subscription failed, will use HTTP polling fallback'
+      );
+      console.error('   - Error details:', error.message);
     },
   });
 
@@ -393,6 +260,15 @@ export function DeviceGrid() {
         const device = (subscriptionData as unknown as DeviceStatusChangedData)
           .deviceStatusChanged;
 
+        // Mark WebSocket as working when we receive data
+        if (!wsConnected) {
+          console.log(
+            '✅ DeviceGrid: WebSocket working - received device status update'
+          );
+          setWsConnected(true);
+          setSubscriptionErrors(0);
+        }
+
         // Update store with new status
         updateDeviceStatus(device.id, device.status, device.isActive);
 
@@ -402,28 +278,15 @@ export function DeviceGrid() {
     },
     onError: (error: ApolloError) => {
       console.error('❌ DeviceGrid: Device status subscription error:', error);
-      console.error('   - Error name:', error.name);
-      console.error('   - Error message:', error.message);
-      console.error('   - Error stack:', error.stack);
-      console.error('   - GraphQL errors:', error.graphQLErrors);
-      console.error('   - Network error:', error.networkError);
-
-      // Improved error handling with specific error types
-      if (error.networkError) {
-        setWsError('Network connection failed');
-      } else if (error.graphQLErrors && error.graphQLErrors.length > 0) {
-        setWsError(
-          `GraphQL error: ${
-            error.graphQLErrors[0]?.message || 'Unknown GraphQL error'
-          }`
-        );
-      } else {
-        setWsError(`Device subscription error: ${error.message}`);
-      }
+      setWsConnected(false);
+      setSubscriptionErrors((prev) => prev + 1);
+      console.error(
+        '   - WebSocket subscription failed, will use HTTP polling fallback'
+      );
     },
   });
 
-  // No additional fallback polling needed - the main query already handles this
+  // Conditional polling is handled by the main query based on WebSocket connection status
 
   // Loading skeleton
   if (loading) {
@@ -550,27 +413,6 @@ export function DeviceGrid() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       {/* Stats Summary */}
       <div className="mb-6 text-center">
-        <div className="flex items-center justify-center space-x-4 mb-2">
-          {/* Connection Status */}
-          <div className="flex items-center space-x-1">
-            {wsConnected ? (
-              <>
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                <span className="text-xs text-green-600 font-medium">
-                  Real-time Active
-                </span>
-              </>
-            ) : (
-              <>
-                <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></div>
-                <span className="text-xs text-orange-600 font-medium">
-                  {wsError ? 'Using HTTP Fallback' : 'Connecting...'}
-                </span>
-              </>
-            )}
-          </div>
-        </div>
-
         <p className="text-sm text-gray-600">
           Monitoring{' '}
           <span className="font-semibold text-slate-900">{devices.length}</span>{' '}
@@ -594,16 +436,19 @@ export function DeviceGrid() {
         </p>
         <p className="text-xs text-gray-500 mt-1">
           Last updated: {lastUpdate.toLocaleTimeString()}
-          {wsConnected ? (
-            <span className="text-green-600 ml-2">
-              • WebSocket Mode (Polling: 10min)
-            </span>
-          ) : (
-            <span className="text-orange-600 ml-2">
-              • HTTP Mode (Polling: 30sec)
+          {' • '}
+          <span
+            className={`font-medium ${
+              wsConnected ? 'text-green-600' : 'text-orange-600'
+            }`}
+          >
+            {wsConnected ? '🔗 Real-time' : '📡 Polling'}
+          </span>
+          {subscriptionErrors > 0 && (
+            <span className="text-red-500 ml-1">
+              (⚠️ {subscriptionErrors} errors)
             </span>
           )}
-          {wsError && <span className="text-red-500 ml-2">• {wsError}</span>}
         </p>
       </div>
 

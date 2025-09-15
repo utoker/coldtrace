@@ -17,12 +17,6 @@ const GET_DASHBOARD_STATS = gql`
         timestamp
       }
     }
-    getActiveAlerts {
-      id
-      severity
-      type
-      acknowledged
-    }
   }
 `;
 
@@ -34,18 +28,6 @@ const TEMPERATURE_UPDATES = gql`
       temperature
       status
       timestamp
-    }
-  }
-`;
-
-const NEW_ALERTS = gql`
-  subscription NewAlerts {
-    newAlerts {
-      id
-      deviceId
-      severity
-      type
-      acknowledged
     }
   }
 `;
@@ -62,16 +44,8 @@ interface Device {
   };
 }
 
-interface Alert {
-  id: string;
-  severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
-  type: string;
-  acknowledged: boolean;
-}
-
 interface DashboardStatsData {
   getDevices: Device[];
-  getActiveAlerts: Alert[];
 }
 
 export function DashboardStats() {
@@ -109,7 +83,7 @@ export function DashboardStats() {
   // Subscribe to real-time updates - always attempt connection to establish WebSocket
   useSubscription(TEMPERATURE_UPDATES, {
     skip: false, // Always try to connect - this will trigger WebSocket connection
-    onData: ({ data }) => {
+    onData: () => {
       // Refetch dashboard stats when temperature updates occur
       refetch();
     },
@@ -118,18 +92,6 @@ export function DashboardStats() {
         '❌ DashboardStats: Temperature subscription error:',
         error
       );
-      // Don't set wsConnected to false here - let the connection events handle it
-    },
-  });
-
-  useSubscription(NEW_ALERTS, {
-    skip: false, // Always try to connect - this will trigger WebSocket connection
-    onData: ({ data }) => {
-      // Refetch dashboard stats when new alerts occur
-      refetch();
-    },
-    onError: (error) => {
-      console.error('❌ DashboardStats: Alert subscription error:', error);
       // Don't set wsConnected to false here - let the connection events handle it
     },
   });
@@ -166,7 +128,6 @@ export function DashboardStats() {
   }
 
   const devices: Device[] = (data as DashboardStatsData)?.getDevices || [];
-  const alerts: Alert[] = (data as DashboardStatsData)?.getActiveAlerts || [];
 
   // Calculate statistics
   const totalDevices = devices.length;
@@ -182,13 +143,6 @@ export function DashboardStats() {
       d.latestReading &&
       d.latestReading.temperature >= 2 &&
       d.latestReading.temperature <= 8
-  ).length;
-
-  const criticalAlerts = alerts.filter(
-    (a) => a.severity === 'CRITICAL' && !a.acknowledged
-  ).length;
-  const totalUnacknowledgedAlerts = alerts.filter(
-    (a) => !a.acknowledged
   ).length;
 
   const averageTemperature =
@@ -235,37 +189,6 @@ export function DashboardStats() {
           : 'border-yellow-200',
     },
     {
-      title: 'Active Alerts',
-      value: totalUnacknowledgedAlerts,
-      subtitle:
-        criticalAlerts > 0 ? `${criticalAlerts} critical` : 'All handled',
-      icon: criticalAlerts > 0 ? '🚨' : '✅',
-      color:
-        criticalAlerts > 0
-          ? 'red'
-          : totalUnacknowledgedAlerts > 0
-          ? 'yellow'
-          : 'green',
-      bgColor:
-        criticalAlerts > 0
-          ? 'bg-red-50'
-          : totalUnacknowledgedAlerts > 0
-          ? 'bg-yellow-50'
-          : 'bg-green-50',
-      textColor:
-        criticalAlerts > 0
-          ? 'text-red-600'
-          : totalUnacknowledgedAlerts > 0
-          ? 'text-yellow-600'
-          : 'text-green-600',
-      borderColor:
-        criticalAlerts > 0
-          ? 'border-red-200'
-          : totalUnacknowledgedAlerts > 0
-          ? 'border-yellow-200'
-          : 'border-green-200',
-    },
-    {
       title: 'System Health',
       value: `${Math.round(averageBattery)}%`,
       subtitle: `Battery average`,
@@ -294,46 +217,48 @@ export function DashboardStats() {
   ];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
       {stats.map((stat, index) => (
         <div
           key={index}
-          className={`${stat.bgColor} ${stat.borderColor} border rounded-lg shadow-sm hover:shadow-md transition-shadow p-6`}
+          className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-apple hover-lift p-8 border border-white/20"
         >
           <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600 mb-1">
+            <div className="flex-1">
+              <p className="text-sm font-medium text-gray-500 mb-2 tracking-wide uppercase">
                 {stat.title}
               </p>
-              <p className={`text-2xl font-bold ${stat.textColor} mb-1`}>
+              <p className="text-3xl font-light text-gray-900 mb-1">
                 {stat.value}
               </p>
-              <p className="text-xs text-gray-500">{stat.subtitle}</p>
+              <p className="text-sm text-gray-600">{stat.subtitle}</p>
             </div>
-            <div className="flex items-center justify-center w-12 h-12 bg-white rounded-full shadow-sm">
+            <div className="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-50 to-purple-50 rounded-2xl ml-6">
               <span className="text-2xl">{stat.icon}</span>
             </div>
           </div>
 
           {/* Status indicators */}
           {index === 0 && ( // Device status breakdown
-            <div className="mt-4 flex space-x-4 text-xs">
-              <div className="flex items-center space-x-1">
-                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                <span className="text-gray-600">{onlineDevices} online</span>
+            <div className="mt-6 flex space-x-4 text-xs">
+              <div className="flex items-center space-x-2">
+                <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                <span className="text-gray-600 font-medium">
+                  {onlineDevices} online
+                </span>
               </div>
               {offlineDevices > 0 && (
-                <div className="flex items-center space-x-1">
-                  <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                  <span className="text-gray-600">
+                <div className="flex items-center space-x-2">
+                  <div className="w-2 h-2 bg-red-400 rounded-full"></div>
+                  <span className="text-gray-600 font-medium">
                     {offlineDevices} offline
                   </span>
                 </div>
               )}
               {maintenanceDevices > 0 && (
-                <div className="flex items-center space-x-1">
-                  <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
-                  <span className="text-gray-600">
+                <div className="flex items-center space-x-2">
+                  <div className="w-2 h-2 bg-orange-400 rounded-full"></div>
+                  <span className="text-gray-600 font-medium">
                     {maintenanceDevices} maintenance
                   </span>
                 </div>
@@ -343,10 +268,10 @@ export function DashboardStats() {
 
           {index === 1 &&
             devicesWithReadings.length > 0 && ( // Temperature range indicator
-              <div className="mt-4">
-                <div className="w-full bg-gray-200 rounded-full h-2">
+              <div className="mt-6">
+                <div className="w-full bg-gray-100 rounded-full h-2">
                   <div
-                    className="bg-green-500 h-2 rounded-full transition-all duration-300"
+                    className="bg-gradient-to-r from-green-400 to-green-500 h-2 rounded-full transition-all duration-500"
                     style={{
                       width: `${
                         (inRangeDevices / devicesWithReadings.length) * 100
@@ -354,7 +279,7 @@ export function DashboardStats() {
                     }}
                   ></div>
                 </div>
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-gray-500 mt-2 font-medium">
                   {Math.round(
                     (inRangeDevices / devicesWithReadings.length) * 100
                   )}

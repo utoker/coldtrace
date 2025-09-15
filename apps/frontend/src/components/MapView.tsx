@@ -1,24 +1,31 @@
 'use client';
 
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useQuery, useSubscription } from '@apollo/client/react';
 import { gql } from '@apollo/client';
 import dynamic from 'next/dynamic';
 import { DeviceDetailModal } from './DeviceDetailModal';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import { MapPin, Loader2 } from 'lucide-react';
 
 // Dynamically import the entire map component to avoid SSR issues
 const DynamicMap = dynamic(() => import('./MapComponent'), {
   ssr: false,
   loading: () => (
-    <div
-      className="bg-white rounded-lg shadow overflow-hidden"
-      style={{ height: '600px' }}
-    >
-      <div className="flex items-center justify-center h-full">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-        <span className="ml-2 text-gray-600">Loading map...</span>
-      </div>
-    </div>
+    <Card>
+      <CardContent className="flex items-center justify-center h-[600px]">
+        <div className="flex items-center space-x-2">
+          <Loader2 className="h-6 w-6 animate-spin" />
+          <span>Loading map...</span>
+        </div>
+      </CardContent>
+    </Card>
   ),
 });
 
@@ -42,6 +49,24 @@ interface Device {
 
 interface GetDevicesData {
   getDevices: Device[];
+}
+
+interface TemperatureUpdateData {
+  temperatureUpdates: {
+    id: string;
+    deviceId: string;
+    temperature: number;
+    status: 'NORMAL' | 'WARNING' | 'CRITICAL';
+    timestamp: string;
+    device: {
+      id: string;
+      name: string;
+    };
+  };
+}
+
+interface DeviceStatusChangedData {
+  deviceStatusChanged: Device;
 }
 
 // GraphQL Queries - Updated to include latitude/longitude
@@ -110,35 +135,19 @@ export function MapView() {
   const [isMounted, setIsMounted] = useState(false);
 
   // Fetch devices
-  const { data, loading, error, refetch } = useQuery<GetDevicesData>(
-    GET_DEVICES,
-    {
-      variables: { limit: 100 },
-      errorPolicy: 'all',
-    }
-  );
-
-  // Debounce refetch to prevent excessive updates
-  const refetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  const debouncedRefetch = useCallback(() => {
-    if (refetchTimeoutRef.current) {
-      clearTimeout(refetchTimeoutRef.current);
-    }
-
-    refetchTimeoutRef.current = setTimeout(() => {
-      refetch();
-    }, 1000); // Wait 1 second after the last update
-  }, [refetch]);
+  const { data, loading, error } = useQuery<GetDevicesData>(GET_DEVICES, {
+    variables: { limit: 100 },
+    errorPolicy: 'all',
+  });
 
   // Subscribe to real-time updates
-  useSubscription(TEMPERATURE_UPDATES, {
+  useSubscription<TemperatureUpdateData>(TEMPERATURE_UPDATES, {
     skip: false,
     onData: ({ data }) => {
       console.log('📡 MapView: Temperature update received:', data);
 
-      if (data?.temperatureUpdates) {
-        const tempUpdate = data.temperatureUpdates;
+      if (data?.data?.temperatureUpdates) {
+        const tempUpdate = data.data.temperatureUpdates;
 
         // Update only the specific device's latest reading
         setDevices((prevDevices) =>
@@ -160,13 +169,13 @@ export function MapView() {
   });
 
   // Subscribe to device status changes
-  useSubscription(DEVICE_STATUS_CHANGED, {
+  useSubscription<DeviceStatusChangedData>(DEVICE_STATUS_CHANGED, {
     skip: false,
     onData: ({ data }) => {
       console.log('📡 MapView: Device status change received:', data);
 
-      if (data?.deviceStatusChanged) {
-        const updatedDevice = data.deviceStatusChanged;
+      if (data?.data?.deviceStatusChanged) {
+        const updatedDevice = data.data.deviceStatusChanged;
         console.log(
           `🔄 MapView: Updating device ${updatedDevice.name} status to ${updatedDevice.status}`
         );
@@ -199,13 +208,6 @@ export function MapView() {
   // Handle client-side mounting
   useEffect(() => {
     setIsMounted(true);
-
-    // Cleanup timeout on unmount
-    return () => {
-      if (refetchTimeoutRef.current) {
-        clearTimeout(refetchTimeoutRef.current);
-      }
-    };
   }, []);
 
   const handleDeviceClick = useCallback((device: Device) => {
@@ -252,15 +254,19 @@ export function MapView() {
   }
 
   return (
-    <div className="w-full h-full">
-      {/* Map Header */}
-      <div className="bg-white rounded-lg shadow mb-4 p-4">
+    <Card>
+      <CardHeader>
         <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-xl font-semibold text-gray-900">Device Map</h2>
-            <p className="text-sm text-gray-600">
-              {devicesWithLocation.length} devices with location data
-            </p>
+          <div className="flex items-center space-x-3">
+            <div className="bg-primary/10 p-2 rounded-lg">
+              <MapPin className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <CardTitle>Device Map</CardTitle>
+              <CardDescription>
+                {devicesWithLocation.length} devices with location data
+              </CardDescription>
+            </div>
           </div>
           <div className="flex items-center space-x-4 text-sm">
             <div className="flex items-center">
@@ -281,14 +287,15 @@ export function MapView() {
             </div>
           </div>
         </div>
-      </div>
+      </CardHeader>
 
-      {/* Dynamic Map Component */}
-      <DynamicMap
-        key="map-component" // Prevent remounting
-        devices={devicesWithLocation}
-        onDeviceClick={handleDeviceClick}
-      />
+      <CardContent className="p-0">
+        <DynamicMap
+          key="map-component"
+          devices={devicesWithLocation}
+          onDeviceClick={handleDeviceClick}
+        />
+      </CardContent>
 
       {/* Device Detail Modal */}
       {selectedDevice && (
@@ -298,6 +305,6 @@ export function MapView() {
           onClose={handleModalClose}
         />
       )}
-    </div>
+    </Card>
   );
 }

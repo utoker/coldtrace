@@ -51,15 +51,12 @@ const createHttpLinkClient = () =>
 // Create WebSocket Link factory (client-side only)
 const createWebSocketLink = (): GraphQLWsLink | null => {
   if (typeof window === 'undefined') {
-    console.log('🚫 WebSocket: SSR detected, skipping WebSocket link creation');
     return null;
   }
 
-  console.log('🔄 WebSocket: Creating WebSocket link...');
   const wsUrl =
     process.env.NEXT_PUBLIC_GRAPHQL_WS_ENDPOINT ||
     'ws://localhost:4000/graphql';
-  console.log('🔗 WebSocket: URL =', wsUrl);
 
   try {
     const wsClient = createClient({
@@ -70,9 +67,6 @@ const createWebSocketLink = (): GraphQLWsLink | null => {
       shouldRetry: (errorsOrCloseEvent) => {
         // Retry on connection errors and specific close events
         if (errorsOrCloseEvent instanceof CloseEvent) {
-          console.log(
-            `🔄 WebSocket close event ${errorsOrCloseEvent.code}: ${errorsOrCloseEvent.reason}`
-          );
           // Retry on most connection-related close codes
           return (
             errorsOrCloseEvent.code === 1001 || // Going away (server restart)
@@ -92,13 +86,7 @@ const createWebSocketLink = (): GraphQLWsLink | null => {
         );
       },
       on: {
-        connected: (_socket, payload) => {
-          console.log('✅ GraphQL WebSocket connected successfully', {
-            url:
-              process.env.NEXT_PUBLIC_GRAPHQL_WS_ENDPOINT ||
-              'ws://localhost:4000/graphql',
-            payload,
-          });
+        connected: (_socket, _payload) => {
           // Store connection status globally for UI to access
           if (typeof window !== 'undefined') {
             window.__GRAPHQL_WS_CONNECTED__ = true;
@@ -141,18 +129,12 @@ const createWebSocketLink = (): GraphQLWsLink | null => {
           }
         },
         connecting: () => {
-          console.log('🔄 GraphQL WebSocket connecting...', {
-            url:
-              process.env.NEXT_PUBLIC_GRAPHQL_WS_ENDPOINT ||
-              'ws://localhost:4000/graphql',
-          });
+          // Connection in progress
         },
       },
     });
 
-    console.log('📡 WebSocket: Client created successfully');
     const wsLink = new GraphQLWsLink(wsClient);
-    console.log('✅ WebSocket: GraphQLWsLink created successfully');
     return wsLink;
   } catch (error) {
     console.error('❌ WebSocket: Failed to create WebSocket link:', error);
@@ -162,31 +144,22 @@ const createWebSocketLink = (): GraphQLWsLink | null => {
 
 // Create the split link
 const createSplitLink = (): ApolloLink => {
-  console.log('🔄 Apollo: Creating split link...');
   const httpLink = createHttpLinkClient();
   const wsLink = createWebSocketLink();
 
   // If WebSocket is not available (SSR or creation failed), use HTTP only
   if (!wsLink) {
-    console.log('⚠️ Apollo: WebSocket link not available, using HTTP-only');
     return httpLink;
   }
 
-  console.log('🔀 Apollo: Creating split link with both HTTP and WebSocket');
   // Split based on operation type
   return ApolloLink.split(
     ({ query }) => {
       const definition = getMainDefinition(query);
-      const isSubscription =
+      return (
         definition.kind === 'OperationDefinition' &&
-        definition.operation === 'subscription';
-      if (isSubscription) {
-        console.log(
-          '🔌 Apollo: Routing subscription to WebSocket:',
-          definition.name?.value || 'unnamed'
-        );
-      }
-      return isSubscription;
+        definition.operation === 'subscription'
+      );
     },
     wsLink,
     httpLink
@@ -195,9 +168,6 @@ const createSplitLink = (): ApolloLink => {
 
 // Apollo Client factory function
 export const createApolloClient = () => {
-  console.log('🚀 Apollo: Creating Apollo Client...');
-  console.log('🌍 Apollo: SSR mode =', typeof window === 'undefined');
-
   const splitLink = createSplitLink();
   const cache = createCache();
 
@@ -220,6 +190,5 @@ export const createApolloClient = () => {
     },
   });
 
-  console.log('✅ Apollo: Client created successfully');
   return client;
 };

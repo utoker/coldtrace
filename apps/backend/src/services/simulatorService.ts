@@ -19,37 +19,9 @@ export interface SimulatorResult {
   affectedDevices: any[];
 }
 
-// Helper function to determine reading status
-function getReadingStatus(
-  temperature: number,
-  minTemp?: number | null,
-  maxTemp?: number | null
-): string {
-  if (!minTemp || !maxTemp) return 'NORMAL';
-
-  if (temperature < minTemp - 1 || temperature > maxTemp + 1) {
-    return 'CRITICAL';
-  } else if (temperature < minTemp || temperature > maxTemp) {
-    return 'WARNING';
-  } else {
-    return 'NORMAL';
-  }
-}
-
 // In-memory simulator state (shared with actual simulator if running)
 class SimulatorService {
   private static instance: SimulatorService;
-  private simulatorStats: SimulatorStats = {
-    totalReadings: 0,
-    successfulReadings: 0,
-    failedReadings: 0,
-    alertsCreated: 0,
-    runtime: 0,
-    devicesOnline: 0,
-    devicesOffline: 0,
-    devicesInExcursion: 0,
-    lowBatteryDevices: 0,
-  };
 
   static getInstance(): SimulatorService {
     if (!SimulatorService.instance) {
@@ -100,44 +72,39 @@ class SimulatorService {
           onlineDevices[Math.floor(Math.random() * onlineDevices.length)];
       }
 
-      // Create a high-temperature reading to simulate excursion
-      const excursionReading = await prisma.reading.create({
-        data: {
-          deviceId: device.id,
-          temperature: 12.0, // Above safe range
-          battery: device.battery || 85.0,
-          status: 'CRITICAL',
-          timestamp: new Date(),
-        },
-        include: {
-          device: true,
-        },
+      // Create a high-temperature reading using the createReading resolver
+      // This will trigger the alert logic automatically
+      const excursionTemp = 12.0; // Above safe range
+
+      // Get current device state for accurate battery level
+      const currentDevice = await prisma.device.findUnique({
+        where: { id: device!.id },
       });
 
-      // Create reading with status for subscription
-      const readingWithStatus = {
-        ...excursionReading,
-        status: getReadingStatus(12.0, device.minTemp, device.maxTemp),
-      };
-
-      // Publish temperature update to subscriptions
-      console.log(
-        `📡 Publishing temperature excursion for device ${device.name}`
+      // Use the createReading resolver to ensure proper data handling
+      const { resolvers } = await import('../graphql/resolvers');
+      await resolvers.Mutation.createReading(
+        null,
+        {
+          input: {
+            deviceId: device!.id,
+            temperature: excursionTemp,
+            battery: currentDevice?.battery || 85.0,
+          },
+        },
+        { prisma }
       );
-      pubsub.publish('TEMPERATURE_UPDATES', {
-        temperatureUpdates: readingWithStatus,
-      });
 
-      // Also publish to device-specific channel
-      const deviceSpecificChannel = `TEMPERATURE_UPDATES_${device.id}`;
-      pubsub.publish(deviceSpecificChannel, {
-        temperatureUpdates: readingWithStatus,
-      });
+      console.log(
+        `🌡️ SimulatorService: Created temperature excursion reading for ${
+          device?.name ?? 'Unknown device'
+        } at ${excursionTemp}°C`
+      );
 
       return {
         success: true,
-        message: `Temperature excursion triggered on ${device.name} (12°C)`,
-        affectedDevices: [device],
+        message: `Temperature excursion triggered on ${device!.name} (12°C)`,
+        affectedDevices: [device!],
       };
     } catch (error) {
       console.error('Error triggering excursion:', error);
@@ -183,44 +150,61 @@ class SimulatorService {
           onlineDevices[Math.floor(Math.random() * onlineDevices.length)];
       }
 
-      // Create a reading with low battery
+      // Create a reading with low battery using the createReading resolver
+      // This will trigger the alert logic automatically
       const lowBattery = Math.random() * 15 + 5; // 5-20%
-      const batteryReading = await prisma.reading.create({
-        data: {
-          deviceId: device.id,
-          temperature: 5.0, // Normal temperature
-          battery: lowBattery,
-          status: 'NORMAL',
-          timestamp: new Date(),
+
+      // First, update the device's battery field in the database
+      await prisma.device.update({
+        where: { id: device!.id },
+
+        data: { battery: lowBattery },
+      });
+
+      // Use the createReading resolver to ensure proper data handling
+      const { resolvers } = await import('../graphql/resolvers');
+      await resolvers.Mutation.createReading(
+        null,
+        {
+          input: {
+            deviceId: device!.id,
+            temperature: 5.0, // Normal temperature
+            battery: lowBattery,
+          },
         },
+        { prisma }
+      );
+
+      console.log(
+        `🔋 SimulatorService: Created low battery reading for ${
+          device!.name
+        } with ${lowBattery.toFixed(1)}% battery`
+      );
+
+      // Get the updated device with new battery level
+      const updatedDevice = await prisma.device.findUnique({
+        where: { id: device!.id },
         include: {
-          device: true,
+          readings: {
+            take: 1,
+            orderBy: { timestamp: 'desc' },
+          },
         },
       });
 
-      // Create reading with status for subscription
-      const readingWithStatus = {
-        ...batteryReading,
-        status: getReadingStatus(5.0, device.minTemp, device.maxTemp),
-      };
-
-      // Publish temperature update to subscriptions
-      pubsub.publish('TEMPERATURE_UPDATES', {
-        temperatureUpdates: readingWithStatus,
-      });
-
-      // Also publish to device-specific channel
-      const deviceSpecificChannel = `TEMPERATURE_UPDATES_${device.id}`;
-      pubsub.publish(deviceSpecificChannel, {
-        temperatureUpdates: readingWithStatus,
-      });
+      // Publish device status change to update frontend
+      if (updatedDevice) {
+        pubsub.publish('DEVICE_STATUS_CHANGED', {
+          deviceStatusChanged: updatedDevice,
+        });
+      }
 
       return {
         success: true,
-        message: `Low battery simulated on ${device.name} (${lowBattery.toFixed(
-          1
-        )}%)`,
-        affectedDevices: [device],
+        message: `Low battery simulated on ${
+          device!.name
+        } (${lowBattery.toFixed(1)}%)`,
+        affectedDevices: [device!],
       };
     } catch (error) {
       console.error('Error simulating low battery:', error);
@@ -268,23 +252,19 @@ class SimulatorService {
 
       // Update device status to offline
       const updatedDevice = await prisma.device.update({
-        where: { id: device.id },
+        where: { id: device!.id },
         data: { status: 'OFFLINE' },
         include: {
           readings: {
             take: 1,
             orderBy: { timestamp: 'desc' },
           },
-          alerts: {
-            where: { acknowledged: false },
-            orderBy: { createdAt: 'desc' },
-          },
         },
       });
 
       // Publish device status change
       console.log(
-        `📡 Publishing device status change: ${device.name} -> OFFLINE`
+        `📡 Publishing device status change: ${device!.name} -> OFFLINE`
       );
       pubsub.publish('DEVICE_STATUS_CHANGED', {
         deviceStatusChanged: updatedDevice,
@@ -292,7 +272,7 @@ class SimulatorService {
 
       return {
         success: true,
-        message: `${device.name} has been taken offline`,
+        message: `${device!.name} has been taken offline`,
         affectedDevices: [updatedDevice],
       };
     } catch (error) {
@@ -333,10 +313,6 @@ class SimulatorService {
             take: 1,
             orderBy: { timestamp: 'desc' },
           },
-          alerts: {
-            where: { acknowledged: false },
-            orderBy: { createdAt: 'desc' },
-          },
         },
       });
 
@@ -362,10 +338,6 @@ class SimulatorService {
               readings: {
                 take: 1,
                 orderBy: { timestamp: 'desc' },
-              },
-              alerts: {
-                where: { acknowledged: false },
-                orderBy: { createdAt: 'desc' },
               },
             },
           });
@@ -415,24 +387,36 @@ class SimulatorService {
         };
       }
 
-      // Bring devices online
+      // Bring devices online with good battery levels
       const deviceIds = offlineDevices.map((d) => d.id);
       await prisma.device.updateMany({
         where: { id: { in: deviceIds } },
-        data: { status: 'ONLINE' },
+        data: {
+          status: 'ONLINE',
+          battery: 85 + Math.random() * 15, // 85-100%
+        },
       });
 
-      // Create readings for the newly online devices
-      const readingPromises = offlineDevices.map((device) =>
-        prisma.reading.create({
-          data: {
-            deviceId: device.id,
-            temperature: 5.0,
-            battery: 85 + Math.random() * 15, // 85-100%
-            status: 'NORMAL',
-            timestamp: new Date(),
+      // Get updated devices with new battery levels
+      const updatedDevicesForReadings = await prisma.device.findMany({
+        where: { id: { in: deviceIds } },
+      });
+
+      // Create readings for the newly online devices using the createReading resolver
+      // This ensures proper data handling and WebSocket events are published
+      const { resolvers } = await import('../graphql/resolvers');
+      const readingPromises = updatedDevicesForReadings.map((device) =>
+        resolvers.Mutation.createReading(
+          null,
+          {
+            input: {
+              deviceId: device.id,
+              temperature: 5.0,
+              battery: device.battery,
+            },
           },
-        })
+          { prisma }
+        )
       );
 
       await Promise.all(readingPromises);
@@ -445,10 +429,6 @@ class SimulatorService {
             take: 1,
             orderBy: { timestamp: 'desc' },
           },
-          alerts: {
-            where: { acknowledged: false },
-            orderBy: { createdAt: 'desc' },
-          },
         },
       });
 
@@ -459,37 +439,7 @@ class SimulatorService {
         });
       });
 
-      // Create and publish temperature readings for the newly online devices
-      const readingPromises2 = updatedDevices.map(async (device) => {
-        const reading = await prisma.reading.findFirst({
-          where: { deviceId: device.id },
-          orderBy: { timestamp: 'desc' },
-          include: { device: true },
-        });
-
-        if (reading) {
-          const readingWithStatus = {
-            ...reading,
-            status: getReadingStatus(
-              reading.temperature,
-              device.minTemp,
-              device.maxTemp
-            ),
-          };
-
-          // Publish temperature update
-          pubsub.publish('TEMPERATURE_UPDATES', {
-            temperatureUpdates: readingWithStatus,
-          });
-
-          const deviceSpecificChannel = `TEMPERATURE_UPDATES_${device.id}`;
-          pubsub.publish(deviceSpecificChannel, {
-            temperatureUpdates: readingWithStatus,
-          });
-        }
-      });
-
-      await Promise.all(readingPromises2);
+      // Temperature updates are already published by the createReading resolver
 
       return {
         success: true,
@@ -524,23 +474,35 @@ class SimulatorService {
         };
       }
 
-      // Reset all devices to normal
+      // Reset all devices to normal with good battery levels
       await prisma.device.updateMany({
         where: { id: { in: devicesToReset.map((d) => d.id) } },
-        data: { status: 'ONLINE' },
+        data: {
+          status: 'ONLINE',
+          battery: 85 + Math.random() * 15, // 85-100%
+        },
       });
 
-      // Create normal readings for all reset devices
-      const readingPromises = devicesToReset.map((device) =>
-        prisma.reading.create({
-          data: {
-            deviceId: device.id,
-            temperature: 5.0,
-            battery: 85 + Math.random() * 15, // 85-100%
-            status: 'NORMAL',
-            timestamp: new Date(),
+      // Get updated devices with new battery levels
+      const updatedDevicesForReadings = await prisma.device.findMany({
+        where: { id: { in: devicesToReset.map((d) => d.id) } },
+      });
+
+      // Create normal readings for all reset devices using the createReading resolver
+      // This ensures proper data handling and WebSocket events are published
+      const { resolvers } = await import('../graphql/resolvers');
+      const readingPromises = updatedDevicesForReadings.map((device) =>
+        resolvers.Mutation.createReading(
+          null,
+          {
+            input: {
+              deviceId: device.id,
+              temperature: 5.0,
+              battery: device.battery,
+            },
           },
-        })
+          { prisma }
+        )
       );
 
       await Promise.all(readingPromises);
@@ -553,10 +515,6 @@ class SimulatorService {
             take: 1,
             orderBy: { timestamp: 'desc' },
           },
-          alerts: {
-            where: { acknowledged: false },
-            orderBy: { createdAt: 'desc' },
-          },
         },
       });
 
@@ -567,37 +525,7 @@ class SimulatorService {
         });
       });
 
-      // Publish temperature readings for reset devices
-      const temperaturePromises = updatedDevices.map(async (device) => {
-        const reading = await prisma.reading.findFirst({
-          where: { deviceId: device.id },
-          orderBy: { timestamp: 'desc' },
-          include: { device: true },
-        });
-
-        if (reading) {
-          const readingWithStatus = {
-            ...reading,
-            status: getReadingStatus(
-              reading.temperature,
-              device.minTemp,
-              device.maxTemp
-            ),
-          };
-
-          // Publish temperature update
-          pubsub.publish('TEMPERATURE_UPDATES', {
-            temperatureUpdates: readingWithStatus,
-          });
-
-          const deviceSpecificChannel = `TEMPERATURE_UPDATES_${device.id}`;
-          pubsub.publish(deviceSpecificChannel, {
-            temperatureUpdates: readingWithStatus,
-          });
-        }
-      });
-
-      await Promise.all(temperaturePromises);
+      // Temperature updates are already published by the createReading resolver
 
       return {
         success: true,
@@ -636,14 +564,6 @@ class SimulatorService {
         },
       });
 
-      const alerts = await prisma.alert.count({
-        where: {
-          createdAt: {
-            gte: new Date(Date.now() - 24 * 60 * 60 * 1000), // Last 24 hours
-          },
-        },
-      });
-
       const devicesOnline = devices.filter((d) => d.status === 'ONLINE').length;
       const devicesOffline = devices.filter(
         (d) => d.status === 'OFFLINE'
@@ -670,7 +590,7 @@ class SimulatorService {
         totalReadings,
         successfulReadings: recentReadings.length, // Approximate
         failedReadings: 0, // Would need to track this separately
-        alertsCreated: alerts,
+        alertsCreated: 0, // Alerts disabled
         runtime: Math.floor(Date.now() / 1000), // Uptime in seconds
         devicesOnline,
         devicesOffline,

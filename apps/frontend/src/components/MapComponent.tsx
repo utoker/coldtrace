@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, useMemo, useCallback, memo } from 'react';
+import { useEffect, useRef, useState, useMemo, memo } from 'react';
 
 // Types
 interface Device {
@@ -35,17 +35,20 @@ const MapComponent = memo(
     const initializingRef = useRef(false);
     const lastDevicesHashRef = useRef<string>('');
 
+    // Utility function to create device hash for change detection
+    const createDeviceHash = useMemo(
+      () => (device: Device) =>
+        `${device.id}-${device.latitude}-${device.longitude}-${device.status}-${
+          device.latestReading?.status || ''
+        }-${device.battery}`,
+      []
+    );
+
     // Create a stable hash of devices to prevent unnecessary updates
-    const devicesHash = useMemo(() => {
-      return devices
-        .map(
-          (d) =>
-            `${d.id}-${d.latitude}-${d.longitude}-${d.status}-${
-              d.latestReading?.status || ''
-            }-${d.battery}`
-        )
-        .join('|');
-    }, [devices]);
+    const devicesHash = useMemo(
+      () => devices.map(createDeviceHash).join('|'),
+      [devices, createDeviceHash]
+    );
 
     // Initialize map
     useEffect(() => {
@@ -60,13 +63,81 @@ const MapComponent = memo(
           // Import Leaflet dynamically
           const L = await import('leaflet');
 
-          // Import CSS
+          // Import CSS and inject custom styles
           if (typeof window !== 'undefined') {
             const link = document.createElement('link');
             link.rel = 'stylesheet';
             link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
             if (!document.querySelector(`link[href="${link.href}"]`)) {
               document.head.appendChild(link);
+            }
+
+            // Inject custom map styles
+            if (!document.querySelector('#map-component-styles')) {
+              const style = document.createElement('style');
+              style.id = 'map-component-styles';
+              style.textContent = `
+                .leaflet-container,
+                .leaflet-map-pane,
+                .leaflet-tile-pane,
+                .leaflet-overlay-pane,
+                .leaflet-shadow-pane,
+                .leaflet-marker-pane,
+                .leaflet-tooltip-pane,
+                .leaflet-popup-pane,
+                .leaflet-control-container {
+                  z-index: 1 !important;
+                }
+                .leaflet-popup {
+                  z-index: 2 !important;
+                }
+                .device-marker {
+                  width: 20px;
+                  height: 20px;
+                  border-radius: 50%;
+                  border: 3px solid white;
+                  box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+                }
+                .device-popup {
+                  padding: 8px;
+                  min-width: 200px;
+                }
+                .popup-title {
+                  font-weight: 600;
+                  color: #111827;
+                  margin: 0 0 4px 0;
+                }
+                .popup-location {
+                  font-size: 14px;
+                  color: #6b7280;
+                  margin: 0 0 8px 0;
+                }
+                .popup-details {
+                  font-size: 14px;
+                  line-height: 1.5;
+                }
+                .popup-row {
+                  display: flex;
+                  justify-content: space-between;
+                  margin-bottom: 4px;
+                }
+                .popup-button {
+                  margin-top: 8px;
+                  width: 100%;
+                  background-color: #2563eb;
+                  color: white;
+                  padding: 4px 12px;
+                  border-radius: 4px;
+                  border: none;
+                  font-size: 14px;
+                  cursor: pointer;
+                  transition: background-color 0.2s;
+                }
+                .popup-button:hover {
+                  background-color: #1d4ed8;
+                }
+              `;
+              document.head.appendChild(style);
             }
           }
 
@@ -86,7 +157,7 @@ const MapComponent = memo(
             center: [27.9506, -82.4572], // Tampa Bay area
             zoom: 10,
             zoomControl: true,
-            scrollWheelZoom: true,
+            scrollWheelZoom: false,
             doubleClickZoom: true,
             dragging: true,
           });
@@ -142,31 +213,21 @@ const MapComponent = memo(
           });
           markersRef.current.clear();
 
+          // Device status color mapping
+          const getDeviceStatusColor = (device: Device): string => {
+            if (device.status === 'OFFLINE') return '#6b7280'; // gray
+            if (device.status === 'MAINTENANCE') return '#f59e0b'; // yellow
+            if (device.latestReading?.status === 'CRITICAL') return '#ef4444'; // red
+            if (device.latestReading?.status === 'WARNING') return '#f59e0b'; // orange
+            return '#10b981'; // green - normal
+          };
+
           // Create custom icons based on device status
           const createIcon = (device: Device) => {
-            let color = '#10b981'; // green - normal
-
-            if (device.status === 'OFFLINE') {
-              color = '#6b7280'; // gray
-            } else if (device.status === 'MAINTENANCE') {
-              color = '#f59e0b'; // yellow
-            } else if (device.latestReading?.status === 'CRITICAL') {
-              color = '#ef4444'; // red
-            } else if (device.latestReading?.status === 'WARNING') {
-              color = '#f59e0b'; // orange
-            }
+            const color = getDeviceStatusColor(device);
 
             return L.divIcon({
-              html: `
-              <div style="
-                background-color: ${color};
-                width: 20px;
-                height: 20px;
-                border-radius: 50%;
-                border: 3px solid white;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-              "></div>
-            `,
+              html: `<div class="device-marker" style="background-color: ${color}"></div>`,
               className: 'custom-marker',
               iconSize: [20, 20],
               iconAnchor: [10, 10],
@@ -180,75 +241,75 @@ const MapComponent = memo(
                 icon: createIcon(device),
               });
 
-              // Create popup content
-              const popupContent = `
-              <div style="padding: 8px; min-width: 200px;">
-                <h3 style="font-weight: 600; color: #111827; margin: 0 0 4px 0;">${
-                  device.name
-                }</h3>
-                <p style="font-size: 14px; color: #6b7280; margin: 0 0 8px 0;">${
-                  device.location
-                }</p>
-                <div style="font-size: 14px; line-height: 1.5;">
-                  <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
-                    <span>Status:</span>
-                    <span style="font-weight: 500; color: ${
-                      device.status === 'ONLINE'
-                        ? '#059669'
-                        : device.status === 'OFFLINE'
-                        ? '#dc2626'
-                        : '#d97706'
-                    };">
-                      ${device.status}
-                    </span>
-                  </div>
-                  ${
-                    device.latestReading
-                      ? `
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
-                      <span>Temperature:</span>
-                      <span style="font-weight: 500; color: ${
-                        device.latestReading.status === 'CRITICAL'
-                          ? '#dc2626'
-                          : device.latestReading.status === 'WARNING'
-                          ? '#ea580c'
-                          : '#059669'
-                      };">
-                        ${device.latestReading.temperature.toFixed(1)}°C
-                      </span>
-                    </div>
-                  `
-                      : ''
+              // Create popup content with cleaner structure
+              const createPopupContent = (device: Device): string => {
+                const getStatusColor = (status: string) => {
+                  switch (status) {
+                    case 'ONLINE':
+                      return '#059669';
+                    case 'OFFLINE':
+                      return '#dc2626';
+                    default:
+                      return '#d97706';
                   }
-                  <div style="display: flex; justify-content: space-between;">
-                    <span>Battery:</span>
-                    <span style="font-weight: 500; color: ${
-                      device.battery > 20 ? '#059669' : '#dc2626'
-                    };">
-                      ${device.battery}%
-                    </span>
+                };
+
+                const getTemperatureColor = (status?: string) => {
+                  switch (status) {
+                    case 'CRITICAL':
+                      return '#dc2626';
+                    case 'WARNING':
+                      return '#ea580c';
+                    default:
+                      return '#059669';
+                  }
+                };
+
+                const temperatureSection = device.latestReading
+                  ? `<div class="popup-row">
+                       <span>Temperature:</span>
+                       <span style="font-weight: 500; color: ${getTemperatureColor(
+                         device.latestReading.status
+                       )};">
+                         ${device.latestReading.temperature.toFixed(1)}°C
+                       </span>
+                     </div>`
+                  : '';
+
+                return `
+                  <div class="device-popup">
+                    <h3 class="popup-title">${device.name}</h3>
+                    <p class="popup-location">${device.location}</p>
+                    <div class="popup-details">
+                      <div class="popup-row">
+                        <span>Status:</span>
+                        <span style="font-weight: 500; color: ${getStatusColor(
+                          device.status
+                        )};">
+                          ${device.status}
+                        </span>
+                      </div>
+                      ${temperatureSection}
+                      <div class="popup-row">
+                        <span>Battery:</span>
+                        <span style="font-weight: 500; color: ${
+                          device.battery > 20 ? '#059669' : '#dc2626'
+                        };">
+                          ${device.battery}%
+                        </span>
+                      </div>
+                    </div>
+                    <button 
+                      onclick="window.handleDeviceClick('${device.id}')"
+                      class="popup-button"
+                    >
+                      View Details
+                    </button>
                   </div>
-                </div>
-                <button 
-                  onclick="window.handleDeviceClick('${device.id}')"
-                  style="
-                    margin-top: 8px;
-                    width: 100%;
-                    background-color: #2563eb;
-                    color: white;
-                    padding: 4px 12px;
-                    border-radius: 4px;
-                    border: none;
-                    font-size: 14px;
-                    cursor: pointer;
-                  "
-                  onmouseover="this.style.backgroundColor='#1d4ed8'"
-                  onmouseout="this.style.backgroundColor='#2563eb'"
-                >
-                  View Details
-                </button>
-              </div>
-            `;
+                `;
+              };
+
+              const popupContent = createPopupContent(device);
 
               marker.bindPopup(popupContent);
               marker.addTo(map);
@@ -258,11 +319,16 @@ const MapComponent = memo(
 
           // Fit bounds to show all markers
           if (devices.length > 0) {
-            const group = new L.featureGroup(
-              Array.from(markersRef.current.values())
-            );
-            if (group.getBounds().isValid()) {
-              map.fitBounds(group.getBounds().pad(0.1));
+            const markerArray = Array.from(
+              markersRef.current.values()
+            ) as L.Marker[];
+            // Only fit bounds if there are valid markers
+            if (markerArray.length > 0) {
+              const group = L.featureGroup(markerArray);
+              const bounds = group.getBounds();
+              if (bounds.isValid()) {
+                map.fitBounds(bounds.pad(0.1));
+              }
             }
           }
         } catch (error) {
@@ -294,12 +360,12 @@ const MapComponent = memo(
     if (mapError) {
       return (
         <div
-          className="bg-white rounded-lg shadow overflow-hidden"
+          className="rounded-lg border overflow-hidden"
           style={{ height: '600px' }}
         >
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
-              <div className="text-red-600 mb-2">
+              <div className="text-destructive mb-2">
                 <svg
                   className="w-8 h-8 mx-auto"
                   fill="none"
@@ -314,11 +380,11 @@ const MapComponent = memo(
                   />
                 </svg>
               </div>
-              <p className="text-red-600 font-medium">Map failed to load</p>
-              <p className="text-sm text-gray-500 mt-1">{mapError}</p>
+              <p className="text-destructive font-medium">Map failed to load</p>
+              <p className="text-sm text-muted-foreground mt-1">{mapError}</p>
               <button
                 onClick={() => window.location.reload()}
-                className="mt-3 px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+                className="mt-3 px-4 py-2 bg-primary text-primary-foreground rounded text-sm hover:bg-primary/90"
               >
                 Reload Page
               </button>
@@ -330,18 +396,18 @@ const MapComponent = memo(
 
     return (
       <div
-        className="bg-white rounded-lg shadow overflow-hidden relative"
+        className="rounded-lg border overflow-hidden relative"
         style={{ height: '600px' }}
       >
         <div
           ref={mapRef}
-          style={{ height: '100%', width: '100%' }}
+          style={{ height: '100%', width: '100%', zIndex: 1 }}
           className="leaflet-container"
         />
         {!isMapReady && (
-          <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-90 z-10">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            <span className="ml-2 text-gray-600">Loading map...</span>
+          <div className="absolute inset-0 flex items-center justify-center bg-background/90 z-10">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            <span className="ml-2 text-muted-foreground">Loading map...</span>
           </div>
         )}
       </div>
@@ -350,36 +416,20 @@ const MapComponent = memo(
   (prevProps, nextProps) => {
     // Custom comparison to prevent unnecessary re-renders
     if (prevProps.devices.length !== nextProps.devices.length) {
-      console.log('🗺️ MapComponent: Re-rendering due to device count change');
       return false;
     }
 
+    // Create hash function for consistent comparison
+    const createHash = (device: Device) =>
+      `${device.id}-${device.latitude}-${device.longitude}-${device.status}-${
+        device.latestReading?.status || ''
+      }-${device.battery}`;
+
     // Compare device hashes
-    const prevHash = prevProps.devices
-      .map(
-        (d) =>
-          `${d.id}-${d.latitude}-${d.longitude}-${d.status}-${
-            d.latestReading?.status || ''
-          }-${d.battery}`
-      )
-      .join('|');
-    const nextHash = nextProps.devices
-      .map(
-        (d) =>
-          `${d.id}-${d.latitude}-${d.longitude}-${d.status}-${
-            d.latestReading?.status || ''
-          }-${d.battery}`
-      )
-      .join('|');
+    const prevHash = prevProps.devices.map(createHash).join('|');
+    const nextHash = nextProps.devices.map(createHash).join('|');
 
-    const shouldUpdate = prevHash !== nextHash;
-    if (shouldUpdate) {
-      console.log('🗺️ MapComponent: Re-rendering due to device data change');
-      console.log('Previous hash:', prevHash.substring(0, 100) + '...');
-      console.log('Next hash:', nextHash.substring(0, 100) + '...');
-    }
-
-    return !shouldUpdate; // memo returns true to skip re-render
+    return prevHash === nextHash; // memo returns true to skip re-render
   }
 );
 

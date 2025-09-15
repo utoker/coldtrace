@@ -12,8 +12,20 @@ NC='\033[0m' # No Color
 echo -e "${BLUE}🚀 Starting ColdTrace development environment...${NC}"
 echo -e "${GREEN}💡 Use Ctrl+C to stop all development processes${NC}"
 echo -e "${GREEN}💡 Run 'pnpm dev:stop' for manual cleanup if needed${NC}"
+echo -e "${YELLOW}💡 Note: Simulator will start automatically for real-time data${NC}"
 echo ""
 
-# Just run turbo dev directly - let the user control it with Ctrl+C
-# No signal trapping, no complex process management - keep it simple!
-turbo run dev
+# Start turbo dev and simulator in parallel
+# Run turbo dev in background and simulator in foreground for interactive controls
+turbo run dev &
+TURBO_PID=$!
+
+# Give turbo a moment to start
+sleep 3
+
+# Start simulator with demo mode (interactive controls)
+echo -e "${BLUE}🎮 Starting simulator with interactive controls...${NC}"
+pnpm --filter @coldtrace/simulator dev:demo
+
+# If simulator exits, also stop turbo
+kill $TURBO_PID 2>/dev/null
