@@ -28,6 +28,7 @@ model Device {
   
   // Relations
   readings  Reading[]
+  alerts    Alert[]
 
   // Indexes for performance
   @@index([isActive])
@@ -56,6 +57,32 @@ model Reading {
   @@map("readings")
 }
 
+model Alert {
+  id          String        @id @default(cuid())
+  deviceId    String
+  type        AlertType
+  severity    AlertSeverity
+  title       String
+  message     String
+  isRead      Boolean       @default(false)
+  isResolved  Boolean       @default(false)
+  resolvedAt  DateTime?
+  resolvedBy  String?       // User who resolved it
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  
+  // Relations
+  device      Device        @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  
+  // Indexes for performance
+  @@index([deviceId])
+  @@index([type])
+  @@index([severity])
+  @@index([isRead])
+  @@index([isResolved])
+  @@index([createdAt(sort: Desc)])
+  @@map("alerts")
+}
 
 // - Product, Shipment, ShipmentProduct, TrackingEvent
 
@@ -67,6 +94,18 @@ enum DeviceStatus {
 
 enum ReadingStatus {
   NORMAL
+  WARNING
+  CRITICAL
+}
+
+enum AlertType {
+  TEMPERATURE_EXCURSION
+  DEVICE_OFFLINE
+  LOW_BATTERY
+  CONNECTION_LOST
+}
+
+enum AlertSeverity {
   WARNING
   CRITICAL
 }

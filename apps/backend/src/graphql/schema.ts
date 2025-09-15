@@ -23,6 +23,17 @@ export const typeDefs = gql`
       limit: Int = 1000
     ): DeviceHistoryResult!
     getDeviceStats(deviceId: ID!): DeviceStats!
+
+    # Alert Queries
+    getAlerts(
+      deviceId: ID
+      unreadOnly: Boolean = false
+      limit: Int = 50
+      offset: Int = 0
+    ): [Alert!]!
+    getAlert(id: ID!): Alert
+    getUnreadAlertCount(deviceId: ID): Int!
+    getAlertStats: AlertStats!
   }
 
   type Mutation {
@@ -38,12 +49,25 @@ export const typeDefs = gql`
     simulateBatchArrival: SimulatorResult!
     returnToNormal: SimulatorResult!
     getSimulatorStats: SimulatorStats!
+
+    # Alert Mutations
+    markAlertAsRead(id: ID!): Alert!
+    markMultipleAlertsAsRead(ids: [ID!]!): BulkUpdateResult!
+    resolveAlert(id: ID!, resolvedBy: String): Alert!
+    deleteAlert(id: ID!): Alert!
   }
 
   type Subscription {
     temperatureUpdates(deviceId: ID): Reading!
     deviceStatusChanged: Device!
     ping: String!
+
+    # Alert Subscriptions
+    alertCreated: Alert!
+    alertUpdated: Alert!
+    alertResolved: Alert!
+    alertDeleted: Alert!
+    alertsBulkUpdated: BulkUpdateNotification!
   }
 
   scalar DateTime
@@ -64,6 +88,8 @@ export const typeDefs = gql`
     updatedAt: DateTime!
     readings: [Reading!]!
     latestReading: Reading
+    alerts: [Alert!]!
+    unreadAlertCount: Int!
   }
 
   type Reading {
@@ -164,5 +190,60 @@ export const typeDefs = gql`
     devicesOffline: Int!
     devicesInExcursion: Int!
     lowBatteryDevices: Int!
+  }
+
+  # Alert Types
+  type Alert {
+    id: ID!
+    deviceId: ID!
+    type: AlertType!
+    severity: AlertSeverity!
+    title: String!
+    message: String!
+    isRead: Boolean!
+    isResolved: Boolean!
+    resolvedAt: DateTime
+    resolvedBy: String
+    createdAt: DateTime!
+    updatedAt: DateTime!
+    device: Device!
+  }
+
+  enum AlertType {
+    TEMPERATURE_EXCURSION
+    DEVICE_OFFLINE
+    LOW_BATTERY
+    CONNECTION_LOST
+  }
+
+  enum AlertSeverity {
+    WARNING
+    CRITICAL
+  }
+
+  type AlertStats {
+    total: Int!
+    unread: Int!
+    critical: Int!
+    warning: Int!
+    resolved: Int!
+    byType: AlertTypeStats!
+  }
+
+  type AlertTypeStats {
+    TEMPERATURE_EXCURSION: Int!
+    DEVICE_OFFLINE: Int!
+    LOW_BATTERY: Int!
+    CONNECTION_LOST: Int!
+  }
+
+  type BulkUpdateResult {
+    count: Int!
+    success: Boolean!
+  }
+
+  type BulkUpdateNotification {
+    alertIds: [ID!]!
+    action: String!
   }
 `;

@@ -4,6 +4,7 @@ import { GraphQLContext } from './context';
 import { PrismaClient } from '@coldtrace/database';
 import { simulatorService } from '../services/simulatorService';
 import { pubsub } from '../lib/pubsub';
+import { alertService } from '../services/alertService';
 
 // Helper function to calculate compliance rate
 async function calculateComplianceRate(
@@ -312,6 +313,58 @@ export const resolvers = {
         throw new GraphQLError('Failed to fetch device stats');
       }
     },
+
+    // Alert Queries
+    getAlerts: async (
+      _parent: any,
+      args: {
+        deviceId?: string;
+        unreadOnly?: boolean;
+        limit?: number;
+        offset?: number;
+      }
+    ) => {
+      try {
+        return await alertService.getAlerts(args);
+      } catch (error) {
+        console.error('Error fetching alerts:', error);
+        throw new GraphQLError('Failed to fetch alerts');
+      }
+    },
+
+    getAlert: async (_parent: any, args: { id: string }) => {
+      try {
+        const alert = await alertService.getAlertById(args.id);
+        if (!alert) {
+          throw new GraphQLError(`Alert with id ${args.id} not found`);
+        }
+        return alert;
+      } catch (error) {
+        console.error('Error fetching alert:', error);
+        if (error instanceof GraphQLError) {
+          throw error;
+        }
+        throw new GraphQLError('Failed to fetch alert');
+      }
+    },
+
+    getUnreadAlertCount: async (_parent: any, args: { deviceId?: string }) => {
+      try {
+        return await alertService.getUnreadCount(args.deviceId);
+      } catch (error) {
+        console.error('Error fetching unread alert count:', error);
+        throw new GraphQLError('Failed to fetch unread alert count');
+      }
+    },
+
+    getAlertStats: async () => {
+      try {
+        return await alertService.getAlertStats();
+      } catch (error) {
+        console.error('Error fetching alert stats:', error);
+        throw new GraphQLError('Failed to fetch alert stats');
+      }
+    },
   },
 
   Mutation: {
@@ -417,6 +470,59 @@ export const resolvers = {
           temperatureUpdates: readingWithStatus,
         });
 
+        // Create alerts for temperature excursions
+        if (status === 'WARNING' || status === 'CRITICAL') {
+          const shouldCreate = await alertService.shouldCreateAlert(
+            device.id,
+            'TEMPERATURE_EXCURSION',
+            5 // Don't create duplicate alerts within 5 minutes
+          );
+
+          if (shouldCreate) {
+            await alertService.createAlert({
+              deviceId: device.id,
+              type: 'TEMPERATURE_EXCURSION',
+              severity: status === 'CRITICAL' ? 'CRITICAL' : 'WARNING',
+              deviceName: device.name,
+              location: device.location,
+              currentValue: input.temperature,
+              threshold:
+                input.temperature < device.minTemp
+                  ? device.minTemp
+                  : device.maxTemp,
+              additionalData: {
+                battery: input.battery,
+                expectedRange: `${device.minTemp}°C - ${device.maxTemp}°C`,
+                readingId: reading.id,
+              },
+            });
+          }
+        }
+
+        // Create alert for low battery
+        if (input.battery && input.battery < 20) {
+          const shouldCreate = await alertService.shouldCreateAlert(
+            device.id,
+            'LOW_BATTERY',
+            60 // Don't create duplicate battery alerts within 1 hour
+          );
+
+          if (shouldCreate) {
+            await alertService.createAlert({
+              deviceId: device.id,
+              type: 'LOW_BATTERY',
+              severity: input.battery < 10 ? 'CRITICAL' : 'WARNING',
+              deviceName: device.name,
+              location: device.location,
+              currentValue: input.battery,
+              additionalData: {
+                temperature: input.temperature,
+                readingId: reading.id,
+              },
+            });
+          }
+        }
+
         return readingWithStatus;
       } catch (error) {
         console.error('Error creating reading:', error);
@@ -490,6 +596,47 @@ export const resolvers = {
         throw new GraphQLError('Failed to get simulator stats');
       }
     },
+
+    // Alert Mutations
+    markAlertAsRead: async (_parent: any, args: { id: string }) => {
+      try {
+        return await alertService.markAsRead(args.id);
+      } catch (error) {
+        console.error('Error marking alert as read:', error);
+        throw new GraphQLError('Failed to mark alert as read');
+      }
+    },
+
+    markMultipleAlertsAsRead: async (_parent: any, args: { ids: string[] }) => {
+      try {
+        const result = await alertService.markMultipleAsRead(args.ids);
+        return { count: result.count, success: true };
+      } catch (error) {
+        console.error('Error marking multiple alerts as read:', error);
+        throw new GraphQLError('Failed to mark alerts as read');
+      }
+    },
+
+    resolveAlert: async (
+      _parent: any,
+      args: { id: string; resolvedBy?: string }
+    ) => {
+      try {
+        return await alertService.resolveAlert(args.id, args.resolvedBy);
+      } catch (error) {
+        console.error('Error resolving alert:', error);
+        throw new GraphQLError('Failed to resolve alert');
+      }
+    },
+
+    deleteAlert: async (_parent: any, args: { id: string }) => {
+      try {
+        return await alertService.deleteAlert(args.id);
+      } catch (error) {
+        console.error('Error deleting alert:', error);
+        throw new GraphQLError('Failed to delete alert');
+      }
+    },
   },
 
   Subscription: {
@@ -519,6 +666,42 @@ export const resolvers = {
         return pubsub.asyncIterableIterator(['PING']);
       },
     },
+
+    // Alert Subscriptions
+    alertCreated: {
+      subscribe: () => {
+        console.log('🔔 Setting up alertCreated subscription');
+        return pubsub.asyncIterableIterator(['ALERT_CREATED']);
+      },
+    },
+
+    alertUpdated: {
+      subscribe: () => {
+        console.log('🔔 Setting up alertUpdated subscription');
+        return pubsub.asyncIterableIterator(['ALERT_UPDATED']);
+      },
+    },
+
+    alertResolved: {
+      subscribe: () => {
+        console.log('🔔 Setting up alertResolved subscription');
+        return pubsub.asyncIterableIterator(['ALERT_RESOLVED']);
+      },
+    },
+
+    alertDeleted: {
+      subscribe: () => {
+        console.log('🔔 Setting up alertDeleted subscription');
+        return pubsub.asyncIterableIterator(['ALERT_DELETED']);
+      },
+    },
+
+    alertsBulkUpdated: {
+      subscribe: () => {
+        console.log('🔔 Setting up alertsBulkUpdated subscription');
+        return pubsub.asyncIterableIterator(['ALERTS_BULK_UPDATED']);
+      },
+    },
   },
 
   // Field resolvers
@@ -531,6 +714,27 @@ export const resolvers = {
       return await prisma.reading.findFirst({
         where: { deviceId: parent.id },
         orderBy: { timestamp: 'desc' },
+      });
+    },
+
+    alerts: async (parent: any, _args: any, { prisma }: GraphQLContext) => {
+      return await prisma.alert.findMany({
+        where: { deviceId: parent.id },
+        orderBy: { createdAt: 'desc' },
+        take: 10, // Limit to recent alerts
+      });
+    },
+
+    unreadAlertCount: async (
+      parent: any,
+      _args: any,
+      { prisma }: GraphQLContext
+    ) => {
+      return await prisma.alert.count({
+        where: {
+          deviceId: parent.id,
+          isRead: false,
+        },
       });
     },
   },

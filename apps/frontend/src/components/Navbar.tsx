@@ -2,6 +2,7 @@
 
 import { Clock } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { AlertBell } from './AlertBell';
 
 export function Navbar() {
   const [currentTime, setCurrentTime] = useState('');
@@ -40,6 +41,7 @@ export function Navbar() {
           </div>
 
           <div className="flex items-center space-x-4">
+            <AlertBell />
             <div className="flex items-center space-x-3 text-sm text-gray-500">
               <Clock className="h-4 w-4" />
               <span className="font-mono">{currentTime}</span>

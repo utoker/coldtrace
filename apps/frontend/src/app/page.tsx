@@ -4,6 +4,7 @@ import { MapView } from '@/components/MapView';
 import { DeviceGrid } from '@/components/DeviceGrid';
 import { Footer } from '@/components/Footer';
 import { DashboardStats } from '@/components/DashboardStats';
+import { AlertSystem } from '@/components/AlertSystem';
 
 export default function Home() {
   return (
@@ -52,6 +53,9 @@ export default function Home() {
 
       {/* Footer */}
       <Footer />
+
+      {/* Alert System */}
+      <AlertSystem />
     </main>
   );
 }
