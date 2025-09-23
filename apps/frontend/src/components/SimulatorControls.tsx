@@ -6,6 +6,7 @@ import { gql } from '@apollo/client';
 import {
   Activity,
   Battery,
+  BatteryCharging,
   Power,
   Thermometer,
   Zap,
@@ -94,6 +95,19 @@ const RETURN_TO_NORMAL = gql`
   }
 `;
 
+const RECHARGE_BATTERY = gql`
+  mutation RechargeBattery($deviceId: ID) {
+    rechargeBattery(deviceId: $deviceId) {
+      success
+      message
+      affectedDevices {
+        id
+        name
+      }
+    }
+  }
+`;
+
 interface SimulationResult {
   success: boolean;
   message: string;
@@ -120,6 +134,8 @@ export function SimulatorControls() {
   );
   const [returnToNormal, { loading: normalLoading }] =
     useMutation(RETURN_TO_NORMAL);
+  const [rechargeBattery, { loading: rechargeLoading }] =
+    useMutation(RECHARGE_BATTERY);
 
   const handleMutation = async (mutation: any, variables?: any) => {
     try {
@@ -199,7 +215,7 @@ export function SimulatorControls() {
           {/* Device Selection */}
           <div className="space-y-2">
             <label className="text-sm font-medium">
-              Target Device (optional - leave empty for random)
+              Target Device (DB id or deviceId; empty for random)
             </label>
             <input
               type="text"
@@ -287,6 +303,21 @@ export function SimulatorControls() {
               <CheckCircle className="mr-3 h-5 w-5" />
               <span className="font-medium">
                 {normalLoading ? 'Resetting...' : 'Return to Normal'}
+              </span>
+            </button>
+
+            <button
+              onClick={() =>
+                handleMutation(rechargeBattery, {
+                  deviceId: selectedDeviceId || undefined,
+                })
+              }
+              disabled={rechargeLoading}
+              className="flex items-center justify-start px-6 py-4 bg-white border border-gray-200 text-gray-700 rounded-2xl hover:bg-gray-50 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl transform hover:scale-[1.02]"
+            >
+              <BatteryCharging className="mr-3 h-5 w-5" />
+              <span className="font-medium">
+                {rechargeLoading ? 'Recharging...' : 'Recharge Battery'}
               </span>
             </button>
           </div>

@@ -23,6 +23,19 @@ export interface SimulatorResult {
 class SimulatorService {
   private static instance: SimulatorService;
 
+  private async findDeviceByAnyId(idOrExternal?: string) {
+    if (!idOrExternal) return null;
+    // Try primary key first
+    const byId = await prisma.device.findUnique({
+      where: { id: idOrExternal },
+    });
+    if (byId) return byId;
+    // Fallback to external deviceId field
+    return await prisma.device.findUnique({
+      where: { deviceId: idOrExternal },
+    });
+  }
+
   static getInstance(): SimulatorService {
     if (!SimulatorService.instance) {
       SimulatorService.instance = new SimulatorService();
@@ -30,14 +43,95 @@ class SimulatorService {
     return SimulatorService.instance;
   }
 
+  async rechargeBattery(deviceId?: string): Promise<SimulatorResult> {
+    try {
+      let device;
+
+      if (deviceId) {
+        device = await this.findDeviceByAnyId(deviceId);
+
+        if (!device) {
+          return {
+            success: false,
+            message: `Device with ID ${deviceId} not found`,
+            affectedDevices: [],
+          };
+        }
+      } else {
+        // Choose a random device to recharge (prefer online)
+        const candidates = await prisma.device.findMany({
+          where: { isActive: true },
+        });
+
+        if (candidates.length === 0) {
+          return {
+            success: false,
+            message: 'No devices available to recharge',
+            affectedDevices: [],
+          };
+        }
+
+        device = candidates[Math.floor(Math.random() * candidates.length)];
+      }
+
+      // Set battery to 100%
+      await prisma.device.update({
+        where: { id: device!.id },
+        data: { battery: 100 },
+      });
+
+      // Create a normal reading to reflect the recharge event
+      const { resolvers } = await import('../graphql/resolvers');
+      await resolvers.Mutation.createReading(
+        null,
+        {
+          input: {
+            deviceId: device!.id,
+            temperature: 5.0,
+            battery: 100,
+          },
+        },
+        { prisma }
+      );
+
+      // Fetch updated device and publish
+      const updatedDevice = await prisma.device.findUnique({
+        where: { id: device!.id },
+        include: {
+          readings: {
+            take: 1,
+            orderBy: { timestamp: 'desc' },
+          },
+        },
+      });
+
+      if (updatedDevice) {
+        pubsub.publish('DEVICE_STATUS_CHANGED', {
+          deviceStatusChanged: updatedDevice,
+        });
+      }
+
+      return {
+        success: true,
+        message: `Battery recharged to 100% for ${device!.name}`,
+        affectedDevices: [updatedDevice ?? device!],
+      };
+    } catch (error) {
+      console.error('Error recharging battery:', error);
+      return {
+        success: false,
+        message: 'Failed to recharge battery',
+        affectedDevices: [],
+      };
+    }
+  }
+
   async triggerExcursion(deviceId?: string): Promise<SimulatorResult> {
     try {
       let device;
 
       if (deviceId) {
-        device = await prisma.device.findUnique({
-          where: { id: deviceId },
-        });
+        device = await this.findDeviceByAnyId(deviceId);
 
         if (!device) {
           return {
@@ -121,9 +215,7 @@ class SimulatorService {
       let device;
 
       if (deviceId) {
-        device = await prisma.device.findUnique({
-          where: { id: deviceId },
-        });
+        device = await this.findDeviceByAnyId(deviceId);
 
         if (!device) {
           return {
@@ -221,9 +313,7 @@ class SimulatorService {
       let device;
 
       if (deviceId) {
-        device = await prisma.device.findUnique({
-          where: { id: deviceId },
-        });
+        device = await this.findDeviceByAnyId(deviceId);
 
         if (!device) {
           return {

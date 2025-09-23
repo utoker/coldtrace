@@ -327,8 +327,8 @@ class VaccineSimulator {
     // Normal variation: ±1.5°C (90% of the time)
     const normalVariation = (Math.random() - 0.5) * 3.0;
 
-    // 10% chance of excursion outside normal range (reduced if in demo)
-    const excursionChance = device.demoMode ? 0.02 : 0.1; // Less random excursions during demo
+    // Extremely low chance of excursion in production (100x lower than before)
+    const excursionChance = device.demoMode ? 0.02 : 0.001; // Less random excursions during demo
     const randomCheck = Math.random();
     let temperature: number;
 

@@ -48,6 +48,7 @@ export const typeDefs = gql`
     simulatePowerOutage: SimulatorResult!
     simulateBatchArrival: SimulatorResult!
     returnToNormal: SimulatorResult!
+    rechargeBattery(deviceId: ID): SimulatorResult!
     getSimulatorStats: SimulatorStats!
 
     # Alert Mutations

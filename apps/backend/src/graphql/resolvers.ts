@@ -588,6 +588,15 @@ export const resolvers = {
       }
     },
 
+    rechargeBattery: async (_parent: any, args: { deviceId?: string }) => {
+      try {
+        return await simulatorService.rechargeBattery(args.deviceId);
+      } catch (error) {
+        console.error('Error recharging battery:', error);
+        throw new GraphQLError('Failed to recharge battery');
+      }
+    },
+
     getSimulatorStats: async () => {
       try {
         return await simulatorService.getSimulatorStats();
