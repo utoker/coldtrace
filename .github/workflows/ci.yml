@@ -14,6 +14,9 @@ jobs:
       matrix:
         node-version: [18, 20]
 
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -51,8 +54,6 @@ jobs:
         run: pnpm lint
 
       - name: Run tests
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: pnpm test
 
       - name: Run type check
