@@ -4,7 +4,7 @@ import chalk from 'chalk';
 import dotenv from 'dotenv';
 
 // Load environment variables from .env file (if exists)
-dotenv.config({ silent: true }); // Silent: don't fail if .env file doesn't exist
+dotenv.config(); // Load .env file if it exists
 
 // Check if DATABASE_URL is available
 console.log(chalk.blue("🔍 Debug: Checking environment variables..."));
