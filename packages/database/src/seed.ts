@@ -1,4 +1,16 @@
-import { prisma, DeviceStatus, ReadingStatus } from './index';
+import prisma from './index';
+
+// Re-declare minimal enums to avoid type export coupling during build
+enum DeviceStatus {
+  ONLINE = 'ONLINE',
+  OFFLINE = 'OFFLINE',
+}
+
+enum ReadingStatus {
+  NORMAL = 'NORMAL',
+  WARNING = 'WARNING',
+  CRITICAL = 'CRITICAL',
+}
 
 async function seed() {
   console.log('💉 Seeding ColdTrace Vaccine Monitoring System...');

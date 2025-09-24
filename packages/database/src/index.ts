@@ -106,21 +106,26 @@ export const db = {
   async getTemperatureStats(deviceId: string, hours = 24) {
     const startTime = new Date(Date.now() - hours * 60 * 60 * 1000);
 
-    const readings = await prisma.reading.findMany({
-      where: {
-        deviceId,
-        timestamp: { gte: startTime },
-      },
-      select: { temperature: true },
-    });
+    const readings: Array<{ temperature: number }> =
+      await prisma.reading.findMany({
+        where: {
+          deviceId,
+          timestamp: { gte: startTime },
+        },
+        select: { temperature: true },
+      });
 
     if (readings.length === 0) return null;
 
-    const temperatures = readings.map((r) => r.temperature);
+    const temperatures: number[] = readings.map(
+      (r: { temperature: number }) => r.temperature
+    );
     return {
       min: Math.min(...temperatures),
       max: Math.max(...temperatures),
-      avg: temperatures.reduce((a, b) => a + b, 0) / temperatures.length,
+      avg:
+        temperatures.reduce((sum: number, value: number) => sum + value, 0) /
+        temperatures.length,
       count: readings.length,
     };
   },
