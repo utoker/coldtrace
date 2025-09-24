@@ -1,0 +1,38 @@
+name: ColdTrace Simulator
+
+on:
+  schedule:
+    # Run every 2 hours
+    - cron: '0 */2 * * *'
+  workflow_dispatch: # Allow manual triggers
+
+jobs:
+  simulate:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 8
+          
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+        
+      - name: Build packages
+        run: pnpm build
+        
+      - name: Run simulator
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SIM_INTERVAL_MINUTES: 120
+          SIM_RUN_ONCE: true
+        run: pnpm --filter @coldtrace/simulator start
