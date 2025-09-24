@@ -3,10 +3,16 @@ import { prisma } from '@coldtrace/database';
 import chalk from 'chalk';
 import dotenv from 'dotenv';
 
-// Load environment variables
-dotenv.config();
+// Load environment variables from .env file (if exists)
+dotenv.config({ silent: true }); // Silent: don't fail if .env file doesn't exist
 
 // Check if DATABASE_URL is available
+console.log(chalk.blue("🔍 Debug: Checking environment variables..."));
+console.log(chalk.blue("🔍 NODE_ENV:", process.env.NODE_ENV));
+console.log(chalk.blue("🔍 DATABASE_URL exists:", !!process.env.DATABASE_URL));
+if (process.env.DATABASE_URL) {
+  console.log(chalk.blue("🔍 DATABASE_URL starts with:", process.env.DATABASE_URL.substring(0, 20) + "..."));
+}
 if (!process.env.DATABASE_URL) {
   console.log(chalk.red('❌ DATABASE_URL environment variable is not set'));
   console.log(chalk.red('Please ensure you have:'));
