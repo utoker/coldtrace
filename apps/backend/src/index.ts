@@ -21,6 +21,7 @@ const SERVER_CONFIG = {
     'http://localhost:3001',
     'http://127.0.0.1:3000',
     'http://127.0.0.1:3001',
+    'https://coldtrace-frontend.vercel.app',
   ]),
 } as const;
 
