@@ -159,7 +159,7 @@ export class AlertService {
       data: {
         isResolved: true,
         resolvedAt: new Date(),
-        resolvedBy,
+        resolvedBy: resolvedBy ?? null,
         isRead: true, // Auto-mark as read when resolved
       },
       include: {

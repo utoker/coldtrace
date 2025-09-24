@@ -9,7 +9,9 @@
     "lint": "eslint src --ext .ts",
     "clean": "rm -rf dist",
     "generate": "graphql-codegen --config codegen.yml",
-    "generate:watch": "graphql-codegen --config codegen.yml --watch"
+    "generate:watch": "graphql-codegen --config codegen.yml --watch",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@apollo/server": "^5.0.0",
@@ -17,6 +19,7 @@
     "@coldtrace/database": "workspace:*",
     "@coldtrace/env": "workspace:*",
     "@coldtrace/types": "workspace:*",
+    "@coldtrace/logger": "workspace:*",
     "@graphql-tools/schema": "^10.0.25",
     "cors": "^2.8.5",
     "express": "^5.1.0",
@@ -39,6 +42,7 @@
     "@typescript-eslint/parser": "^8.41.0",
     "eslint": "^9.34.0",
     "tsx": "^4.20.5",
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
   }
 }

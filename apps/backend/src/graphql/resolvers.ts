@@ -5,6 +5,7 @@ import { PrismaClient } from '@coldtrace/database';
 import { simulatorService } from '../services/simulatorService';
 import { pubsub } from '../lib/pubsub';
 import { alertService } from '../services/alertService';
+import { createRequestLogger } from '@coldtrace/logger';
 
 // Helper function to calculate compliance rate
 async function calculateComplianceRate(
@@ -103,7 +104,7 @@ export const resolvers = {
         limit?: number;
         offset?: number;
       },
-      { prisma }: GraphQLContext
+      context: GraphQLContext
     ) => {
       const { status, isActive, location, limit = 50, offset = 0 } = args;
       try {
@@ -114,7 +115,7 @@ export const resolvers = {
         if (location)
           where.location = { contains: location, mode: 'insensitive' };
 
-        return await prisma.device.findMany({
+        return await context.prisma.device.findMany({
           where,
           take: limit,
           skip: offset,
@@ -127,7 +128,14 @@ export const resolvers = {
           },
         });
       } catch (error) {
-        console.error('Error fetching devices:', error);
+        const logger = createRequestLogger(
+          context.requestId || 'unknown',
+          'backend'
+        );
+        logger.error(
+          { error: error instanceof Error ? error.message : String(error) },
+          'Error fetching devices'
+        );
         throw new GraphQLError('Failed to fetch devices');
       }
     },
@@ -135,11 +143,11 @@ export const resolvers = {
     getDevice: async (
       _parent: unknown,
       args: { id: string },
-      { prisma }: GraphQLContext
+      context: GraphQLContext
     ) => {
       const { id } = args;
       try {
-        const device = await prisma.device.findUnique({
+        const device = await context.prisma.device.findUnique({
           where: { id },
           include: {
             readings: {
@@ -171,7 +179,7 @@ export const resolvers = {
         endTime?: Date;
         limit?: number;
       },
-      { prisma }: GraphQLContext
+      context: GraphQLContext
     ) => {
       const { deviceId, startTime, endTime, limit = 100 } = args;
       try {
@@ -185,7 +193,7 @@ export const resolvers = {
             (where.timestamp as Record<string, unknown>).lte = endTime;
         }
 
-        return await prisma.reading.findMany({
+        return await context.prisma.reading.findMany({
           where,
           take: limit,
           orderBy: { timestamp: 'desc' },
@@ -209,14 +217,14 @@ export const resolvers = {
         };
         limit?: number;
       },
-      { prisma }: GraphQLContext
+      context: GraphQLContext
     ) => {
       const { deviceId, timeRange, limit = 1000 } = args;
       const { startTime, endTime } = timeRange;
 
       try {
         // Get readings within time range
-        const readings = await prisma.reading.findMany({
+        const readings = await context.prisma.reading.findMany({
           where: {
             deviceId,
             timestamp: {
@@ -232,7 +240,7 @@ export const resolvers = {
         });
 
         // Get total count for pagination info
-        const totalCount = await prisma.reading.count({
+        const totalCount = await context.prisma.reading.count({
           where: {
             deviceId,
             timestamp: {
@@ -271,12 +279,12 @@ export const resolvers = {
     getDeviceStats: async (
       _parent: any,
       args: any,
-      { prisma }: GraphQLContext
+      context: GraphQLContext
     ) => {
       const { deviceId } = args;
       try {
         // Get aggregated temperature stats
-        const tempStats = await prisma.reading.aggregate({
+        const tempStats = await context.prisma.reading.aggregate({
           where: { deviceId },
           _min: { temperature: true, timestamp: true },
           _max: { temperature: true, timestamp: true },
@@ -285,7 +293,7 @@ export const resolvers = {
         });
 
         // Get latest reading for current values
-        const latestReading = await prisma.reading.findFirst({
+        const latestReading = await context.prisma.reading.findFirst({
           where: { deviceId },
           orderBy: { timestamp: 'desc' },
           include: {
@@ -294,11 +302,11 @@ export const resolvers = {
         });
 
         // Calculate compliance rate (percentage of readings within temperature range)
-        const device = await prisma.device.findUnique({
+        const device = await context.prisma.device.findUnique({
           where: { id: deviceId },
         });
         const complianceRate = await calculateComplianceRate(
-          prisma,
+          context.prisma,
           deviceId,
           device?.minTemp,
           device?.maxTemp
@@ -376,14 +384,10 @@ export const resolvers = {
   },
 
   Mutation: {
-    createDevice: async (
-      _parent: any,
-      args: any,
-      { prisma }: GraphQLContext
-    ) => {
+    createDevice: async (_parent: any, args: any, context: GraphQLContext) => {
       const { input } = args;
       try {
-        return await prisma.device.create({
+        return await context.prisma.device.create({
           data: input,
           include: {
             readings: true,
@@ -395,11 +399,7 @@ export const resolvers = {
       }
     },
 
-    updateDevice: async (
-      _parent: any,
-      args: any,
-      { prisma }: GraphQLContext
-    ) => {
+    updateDevice: async (_parent: any, args: any, context: GraphQLContext) => {
       const { id, input } = args;
       try {
         // Filter out null/undefined values to match Prisma's exactOptionalPropertyTypes
@@ -409,7 +409,7 @@ export const resolvers = {
           )
         );
 
-        return await prisma.device.update({
+        return await context.prisma.device.update({
           where: { id },
           data: updateData,
           include: {
@@ -422,15 +422,11 @@ export const resolvers = {
       }
     },
 
-    createReading: async (
-      _parent: any,
-      args: any,
-      { prisma }: GraphQLContext
-    ) => {
+    createReading: async (_parent: any, args: any, context: GraphQLContext) => {
       const { input } = args;
       try {
         // Get device to check temperature thresholds
-        const device = await prisma.device.findUnique({
+        const device = await context.prisma.device.findUnique({
           where: { id: input.deviceId },
         });
 
@@ -447,7 +443,7 @@ export const resolvers = {
         );
 
         // Create the reading
-        const reading = await prisma.reading.create({
+        const reading = await context.prisma.reading.create({
           data: {
             deviceId: input.deviceId,
             temperature: input.temperature,
@@ -709,12 +705,8 @@ export const resolvers = {
 
   // Field resolvers
   Device: {
-    latestReading: async (
-      parent: any,
-      _args: any,
-      { prisma }: GraphQLContext
-    ) => {
-      const reading = await prisma.reading.findFirst({
+    latestReading: async (parent: any, _args: any, context: GraphQLContext) => {
+      const reading = await context.prisma.reading.findFirst({
         where: { deviceId: parent.id },
         orderBy: { timestamp: 'desc' },
       });
@@ -722,7 +714,7 @@ export const resolvers = {
       if (!reading) return null;
 
       // Calculate status based on temperature and battery
-      const device = await prisma.device.findUnique({
+      const device = await context.prisma.device.findUnique({
         where: { id: parent.id },
       });
 
@@ -739,8 +731,8 @@ export const resolvers = {
       };
     },
 
-    alerts: async (parent: any, _args: any, { prisma }: GraphQLContext) => {
-      return await prisma.alert.findMany({
+    alerts: async (parent: any, _args: any, context: GraphQLContext) => {
+      return await context.prisma.alert.findMany({
         where: { deviceId: parent.id },
         orderBy: { createdAt: 'desc' },
         take: 10, // Limit to recent alerts
@@ -750,9 +742,9 @@ export const resolvers = {
     unreadAlertCount: async (
       parent: any,
       _args: any,
-      { prisma }: GraphQLContext
+      context: GraphQLContext
     ) => {
-      return await prisma.alert.count({
+      return await context.prisma.alert.count({
         where: {
           deviceId: parent.id,
           isRead: false,
@@ -762,17 +754,17 @@ export const resolvers = {
   },
 
   Reading: {
-    device: async (parent: any, _args: any, { prisma }: GraphQLContext) => {
-      return await prisma.device.findUnique({
+    device: async (parent: any, _args: any, context: GraphQLContext) => {
+      return await context.prisma.device.findUnique({
         where: { id: parent.deviceId },
       });
     },
-    status: async (parent: any, _args: any, { prisma }: GraphQLContext) => {
+    status: async (parent: any, _args: any, context: GraphQLContext) => {
       // If status is already set on the reading, return it
       if (parent.status) return parent.status;
 
       // Otherwise, calculate it based on temperature and device thresholds
-      const device = await prisma.device.findUnique({
+      const device = await context.prisma.device.findUnique({
         where: { id: parent.deviceId },
       });
       return getReadingStatus(

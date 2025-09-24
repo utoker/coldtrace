@@ -5,7 +5,8 @@
   "imports": {
     "#coldtrace/database": "./packages/database/src/index.js",
     "#coldtrace/types": "./packages/types/src/index.js",
-    "#coldtrace/env": "./packages/env/src/index.js"
+    "#coldtrace/env": "./packages/env/src/index.js",
+    "#coldtrace/logger": "./packages/logger/src/index.js"
   },
   "scripts": {
     "dev": "./scripts/dev.sh",
@@ -17,8 +18,7 @@
     "clean": "turbo run clean",
     "lint": "turbo run lint",
     "test": "turbo run test",
-    "cleanup": "./scripts/cleanup-dev.sh",
-    "cleanup:force": "./scripts/force-kill-dev.sh",
+    "test:watch": "turbo run test:watch",
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down",
     "docker:reset": "docker compose down -v && docker compose up -d",
@@ -41,7 +41,8 @@
     "eslint": "^9.34.0",
     "turbo": "^2.5.6",
     "typescript": "^5.7.2",
-    "typescript-eslint": "^8.41.0"
+    "typescript-eslint": "^8.41.0",
+    "vitest": "^2.1.8"
   },
   "packageManager": "pnpm@10.15.1"
 }
