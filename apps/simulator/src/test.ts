@@ -6,6 +6,19 @@ import dotenv from 'dotenv';
 // Load environment variables
 dotenv.config();
 
+// Check if DATABASE_URL is available
+if (!process.env.DATABASE_URL) {
+  console.log(chalk.red('❌ DATABASE_URL environment variable is not set'));
+  console.log(chalk.red('Please ensure you have:'));
+  console.log(chalk.red('1. Created a .env file in packages/database/'));
+  console.log(chalk.red('2. Set DATABASE_URL to your PostgreSQL connection string'));
+  console.log(chalk.red('3. Started your PostgreSQL server'));
+  console.log(chalk.red(''));
+  console.log(chalk.red('Example DATABASE_URL:'));
+  console.log(chalk.red('DATABASE_URL="postgresql://username:password@localhost:5432/coldtrace?schema=public"'));
+  process.exit(1);
+}
+
 interface TestResult {
   success: boolean;
   message: string;

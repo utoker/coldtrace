@@ -51,6 +51,8 @@ jobs:
         run: pnpm lint
 
       - name: Run tests
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: pnpm test
 
       - name: Run type check
