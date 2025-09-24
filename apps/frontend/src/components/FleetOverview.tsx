@@ -8,7 +8,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+// Badge not used in this component
 import { Progress } from '@/components/ui/progress';
 import {
   XAxis,
@@ -19,15 +19,7 @@ import {
   LineChart,
   Line,
 } from 'recharts';
-import {
-  Activity,
-  Thermometer,
-  Battery,
-  AlertTriangle,
-  TrendingUp,
-  CheckCircle,
-  XCircle,
-} from 'lucide-react';
+import { TrendingUp, CheckCircle, XCircle } from 'lucide-react';
 
 interface Device {
   id: string;
@@ -51,30 +43,16 @@ interface Device {
   }>;
 }
 
-interface AlertStats {
-  total: number;
-  unread: number;
-  critical: number;
-  warning: number;
-  resolved: number;
-  byType: {
-    TEMPERATURE_EXCURSION: number;
-    DEVICE_OFFLINE: number;
-    LOW_BATTERY: number;
-    CONNECTION_LOST: number;
-  };
-}
+// (Unused) Alert statistics interface removed to satisfy linter
 
 interface FleetOverviewProps {
   devices: Device[];
-  alertStats: AlertStats;
   selectedDevice: string;
   dateRange?: { from: Date; to: Date };
 }
 
 export function FleetOverview({
   devices,
-  alertStats,
   selectedDevice,
   dateRange,
 }: FleetOverviewProps) {
@@ -158,48 +136,7 @@ export function FleetOverview({
     };
   }, [filteredDevices]);
 
-  const locationData = useMemo(() => {
-    const locationMap = new Map<
-      string,
-      {
-        location: string;
-        deviceCount: number;
-        onlineCount: number;
-        avgTemperature: number;
-        avgBattery: number;
-        complianceRate: number;
-      }
-    >();
-
-    filteredDevices.forEach((device) => {
-      const existing = locationMap.get(device.location) || {
-        location: device.location,
-        deviceCount: 0,
-        onlineCount: 0,
-        avgTemperature: 0,
-        avgBattery: 0,
-        complianceRate: 0,
-      };
-
-      existing.deviceCount++;
-      if (device.status === 'ONLINE') existing.onlineCount++;
-
-      if (device.latestReading) {
-        existing.avgTemperature += device.latestReading.temperature;
-      }
-      existing.avgBattery += device.battery;
-
-      locationMap.set(device.location, existing);
-    });
-
-    return Array.from(locationMap.values()).map((location) => ({
-      ...location,
-      avgTemperature: location.avgTemperature / location.deviceCount,
-      avgBattery: location.avgBattery / location.deviceCount,
-      uptimeRate: (location.onlineCount / location.deviceCount) * 100,
-      complianceRate: 95 + Math.random() * 5, // Simulate compliance rate for demo
-    }));
-  }, [filteredDevices]);
+  // Previously computed location-level aggregates were unused; removed to satisfy linter
 
   const performanceTrendData = useMemo(() => {
     // Use real data from readings with date filtering

@@ -96,11 +96,12 @@ const sortAlerts = (
         comparison =
           new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
         break;
-      case 'severity':
+      case 'severity': {
         // Critical comes before Warning
-        const severityOrder = { CRITICAL: 2, WARNING: 1 };
+        const severityOrder = { CRITICAL: 2, WARNING: 1 } as const;
         comparison = severityOrder[a.severity] - severityOrder[b.severity];
         break;
+      }
       case 'type':
         comparison = a.type.localeCompare(b.type);
         break;

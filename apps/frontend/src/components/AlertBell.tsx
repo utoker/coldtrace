@@ -19,12 +19,14 @@ export function AlertBell({ className, onClick }: AlertBellProps) {
 
   // Animate only when new alerts are added (unread count increases)
   useEffect(() => {
+    let cleanup: (() => void) | undefined;
     if (unread > previousUnreadCount && previousUnreadCount > 0) {
       setIsAnimating(true);
       const timer = setTimeout(() => setIsAnimating(false), 1000);
-      return () => clearTimeout(timer);
+      cleanup = () => clearTimeout(timer);
     }
     setPreviousUnreadCount(unread);
+    return cleanup;
   }, [unread, previousUnreadCount]);
 
   const handleClick = () => {

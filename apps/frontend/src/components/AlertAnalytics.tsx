@@ -29,19 +29,10 @@ import {
   PieChart,
   Pie,
   Cell,
-  LineChart,
-  Line,
   AreaChart,
   Area,
 } from 'recharts';
-import {
-  AlertTriangle,
-  Clock,
-  CheckCircle,
-  XCircle,
-  TrendingUp,
-  TrendingDown,
-} from 'lucide-react';
+import { TrendingUp } from 'lucide-react';
 
 interface Device {
   id: string;
@@ -429,12 +420,20 @@ export function AlertAnalytics({
                     ))}
                   </Pie>
                   <Tooltip
-                    formatter={(value: number, name: string, props: any) => [
-                      `${value} alerts (${(props.payload.percent * 100).toFixed(
-                        1
-                      )}%)`,
-                      props.payload.type,
-                    ]}
+                    formatter={(value: number, _name: string, item) => {
+                      const percent = (item as any)?.payload?.percent as
+                        | number
+                        | undefined;
+                      const type = (item as any)?.payload?.type as
+                        | string
+                        | undefined;
+                      return [
+                        `${value} alerts (${((percent ?? 0) * 100).toFixed(
+                          1
+                        )}%)`,
+                        type ?? 'Type',
+                      ];
+                    }}
                   />
                 </PieChart>
               </ResponsiveContainer>

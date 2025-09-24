@@ -5,7 +5,6 @@ import { useQuery, useSubscription } from '@apollo/client/react';
 import { useAlertStore } from '@/store/useAlertStore';
 import {
   GET_ALERTS,
-  GET_UNREAD_ALERT_COUNT,
   ALERT_CREATED,
   ALERT_UPDATED,
   ALERT_RESOLVED,
@@ -23,7 +22,7 @@ export function useAlerts() {
     loading,
     error,
     refetch,
-  } = useQuery(GET_ALERTS, {
+  } = useQuery<{ getAlerts: any[] }>(GET_ALERTS, {
     variables: {
       deviceId: filters.deviceId,
       unreadOnly: filters.status === 'unread',
@@ -43,8 +42,8 @@ export function useAlerts() {
   // Subscribe to new alerts
   useSubscription(ALERT_CREATED, {
     onData: ({ data: subscriptionData }) => {
-      if (subscriptionData?.data?.alertCreated) {
-        const newAlert = subscriptionData.data.alertCreated;
+      if ((subscriptionData as any)?.data?.alertCreated) {
+        const newAlert = (subscriptionData as any).data.alertCreated;
         addAlert(newAlert);
 
         // Show toast notification for new alerts
@@ -68,8 +67,8 @@ export function useAlerts() {
   // Subscribe to alert updates
   useSubscription(ALERT_UPDATED, {
     onData: ({ data: subscriptionData }) => {
-      if (subscriptionData?.data?.alertUpdated) {
-        const updatedAlert = subscriptionData.data.alertUpdated;
+      if ((subscriptionData as any)?.data?.alertUpdated) {
+        const updatedAlert = (subscriptionData as any).data.alertUpdated;
         updateAlert(updatedAlert.id, updatedAlert);
       }
     },
@@ -78,8 +77,8 @@ export function useAlerts() {
   // Subscribe to alert resolutions
   useSubscription(ALERT_RESOLVED, {
     onData: ({ data: subscriptionData }) => {
-      if (subscriptionData?.data?.alertResolved) {
-        const resolvedAlert = subscriptionData.data.alertResolved;
+      if ((subscriptionData as any)?.data?.alertResolved) {
+        const resolvedAlert = (subscriptionData as any).data.alertResolved;
         updateAlert(resolvedAlert.id, resolvedAlert);
 
         toast.success('Alert resolved', {
@@ -92,8 +91,8 @@ export function useAlerts() {
   // Subscribe to alert deletions
   useSubscription(ALERT_DELETED, {
     onData: ({ data: subscriptionData }) => {
-      if (subscriptionData?.data?.alertDeleted) {
-        const deletedAlert = subscriptionData.data.alertDeleted;
+      if ((subscriptionData as any)?.data?.alertDeleted) {
+        const deletedAlert = (subscriptionData as any).data.alertDeleted;
         removeAlert(deletedAlert.id);
       }
     },

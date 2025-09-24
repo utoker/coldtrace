@@ -707,7 +707,6 @@ export function AnalyticsDashboard() {
         <TabsContent value="overview" className="space-y-6">
           <FleetOverview
             devices={devices}
-            alertStats={safeAlertStats}
             selectedDevice={selectedDevice}
             dateRange={dateRange as any as { from: Date; to: Date }}
           />

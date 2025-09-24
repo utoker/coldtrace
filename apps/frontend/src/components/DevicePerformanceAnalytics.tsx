@@ -31,13 +31,10 @@ import {
   PieChart,
   Pie,
   Cell,
-  ScatterChart,
-  Scatter,
 } from 'recharts';
 import {
   Activity,
   Battery,
-  Clock,
   TrendingUp,
   AlertTriangle,
   CheckCircle,
@@ -317,12 +314,20 @@ export function DevicePerformanceAnalytics({
                   ))}
                 </Pie>
                 <Tooltip
-                  formatter={(value: number, name: string, props: any) => [
-                    `${value} devices (${(props.payload.percent * 100).toFixed(
-                      1
-                    )}%)`,
-                    props.payload.status,
-                  ]}
+                  formatter={(value: number, _name: string, item) => {
+                    const percent = (item as any)?.payload?.percent as
+                      | number
+                      | undefined;
+                    const status = (item as any)?.payload?.status as
+                      | string
+                      | undefined;
+                    return [
+                      `${value} devices (${((percent ?? 0) * 100).toFixed(
+                        1
+                      )}%)`,
+                      status ?? 'Status',
+                    ];
+                  }}
                 />
               </PieChart>
             </ResponsiveContainer>
@@ -560,6 +565,7 @@ function calculateBatteryDrainRate(
   );
   const firstReading = sortedReadings[0];
   const lastReading = sortedReadings[sortedReadings.length - 1];
+  if (!firstReading || !lastReading) return 0;
 
   const timeDiff =
     new Date(lastReading.timestamp).getTime() -

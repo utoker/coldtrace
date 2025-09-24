@@ -1,6 +1,13 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   transpilePackages: ['@coldtrace/types'],
+  // Enforce clean builds
+  eslint: {
+    ignoreDuringBuilds: false,
+  },
+  typescript: {
+    ignoreBuildErrors: false,
+  },
 
   // Webpack configuration for better chunk handling
   webpack: (config, { isServer }) => {

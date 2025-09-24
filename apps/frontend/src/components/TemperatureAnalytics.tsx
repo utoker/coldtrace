@@ -12,8 +12,6 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import {
-  LineChart,
-  Line,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -27,12 +25,8 @@ import {
   AreaChart,
   Area,
 } from 'recharts';
-import {
-  Thermometer,
-  TrendingUp,
-  TrendingDown,
-  AlertTriangle,
-} from 'lucide-react';
+import { Line } from 'recharts';
+import { Thermometer, TrendingUp, TrendingDown } from 'lucide-react';
 
 interface Device {
   id: string;
@@ -385,12 +379,20 @@ export function TemperatureAnalytics({
                     ))}
                   </Pie>
                   <Tooltip
-                    formatter={(value: number, name: string, props: any) => [
-                      `${value} readings (${(
-                        props.payload.percent * 100
-                      ).toFixed(1)}%)`,
-                      props.payload.range,
-                    ]}
+                    formatter={(value: number, _name: string, item) => {
+                      const percent = (item as any)?.payload?.percent as
+                        | number
+                        | undefined;
+                      const range = (item as any)?.payload?.range as
+                        | string
+                        | undefined;
+                      return [
+                        `${value} readings (${((percent ?? 0) * 100).toFixed(
+                          1
+                        )}%)`,
+                        range ?? 'Range',
+                      ];
+                    }}
                   />
                 </RechartsPieChart>
               </ResponsiveContainer>

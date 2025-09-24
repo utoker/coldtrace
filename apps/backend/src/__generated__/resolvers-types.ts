@@ -18,6 +18,65 @@ export type Scalars = {
   DateTime: { input: Date; output: Date; }
 };
 
+export type Alert = {
+  __typename?: 'Alert';
+  createdAt: Scalars['DateTime']['output'];
+  device: Device;
+  deviceId: Scalars['ID']['output'];
+  id: Scalars['ID']['output'];
+  isRead: Scalars['Boolean']['output'];
+  isResolved: Scalars['Boolean']['output'];
+  message: Scalars['String']['output'];
+  resolvedAt?: Maybe<Scalars['DateTime']['output']>;
+  resolvedBy?: Maybe<Scalars['String']['output']>;
+  severity: AlertSeverity;
+  title: Scalars['String']['output'];
+  type: AlertType;
+  updatedAt: Scalars['DateTime']['output'];
+};
+
+export enum AlertSeverity {
+  Critical = 'CRITICAL',
+  Warning = 'WARNING'
+}
+
+export type AlertStats = {
+  __typename?: 'AlertStats';
+  byType: AlertTypeStats;
+  critical: Scalars['Int']['output'];
+  resolved: Scalars['Int']['output'];
+  total: Scalars['Int']['output'];
+  unread: Scalars['Int']['output'];
+  warning: Scalars['Int']['output'];
+};
+
+export enum AlertType {
+  ConnectionLost = 'CONNECTION_LOST',
+  DeviceOffline = 'DEVICE_OFFLINE',
+  LowBattery = 'LOW_BATTERY',
+  TemperatureExcursion = 'TEMPERATURE_EXCURSION'
+}
+
+export type AlertTypeStats = {
+  __typename?: 'AlertTypeStats';
+  CONNECTION_LOST: Scalars['Int']['output'];
+  DEVICE_OFFLINE: Scalars['Int']['output'];
+  LOW_BATTERY: Scalars['Int']['output'];
+  TEMPERATURE_EXCURSION: Scalars['Int']['output'];
+};
+
+export type BulkUpdateNotification = {
+  __typename?: 'BulkUpdateNotification';
+  action: Scalars['String']['output'];
+  alertIds: Array<Scalars['ID']['output']>;
+};
+
+export type BulkUpdateResult = {
+  __typename?: 'BulkUpdateResult';
+  count: Scalars['Int']['output'];
+  success: Scalars['Boolean']['output'];
+};
+
 export type CreateDeviceInput = {
   deviceId: Scalars['String']['input'];
   latitude?: InputMaybe<Scalars['Float']['input']>;
@@ -36,6 +95,7 @@ export type CreateReadingInput = {
 
 export type Device = {
   __typename?: 'Device';
+  alerts: Array<Alert>;
   battery?: Maybe<Scalars['Float']['output']>;
   createdAt: Scalars['DateTime']['output'];
   deviceId: Scalars['String']['output'];
@@ -50,6 +110,7 @@ export type Device = {
   name: Scalars['String']['output'];
   readings: Array<Reading>;
   status: DeviceStatus;
+  unreadAlertCount: Scalars['Int']['output'];
   updatedAt: Scalars['DateTime']['output'];
 };
 
@@ -80,7 +141,12 @@ export type Mutation = {
   __typename?: 'Mutation';
   createDevice: Device;
   createReading: Reading;
+  deleteAlert: Alert;
   getSimulatorStats: SimulatorStats;
+  markAlertAsRead: Alert;
+  markMultipleAlertsAsRead: BulkUpdateResult;
+  rechargeBattery: SimulatorResult;
+  resolveAlert: Alert;
   returnToNormal: SimulatorResult;
   simulateBatchArrival: SimulatorResult;
   simulateLowBattery: SimulatorResult;
@@ -98,6 +164,32 @@ export type MutationCreateDeviceArgs = {
 
 export type MutationCreateReadingArgs = {
   input: CreateReadingInput;
+};
+
+
+export type MutationDeleteAlertArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
+export type MutationMarkAlertAsReadArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
+export type MutationMarkMultipleAlertsAsReadArgs = {
+  ids: Array<Scalars['ID']['input']>;
+};
+
+
+export type MutationRechargeBatteryArgs = {
+  deviceId?: InputMaybe<Scalars['ID']['input']>;
+};
+
+
+export type MutationResolveAlertArgs = {
+  id: Scalars['ID']['input'];
+  resolvedBy?: InputMaybe<Scalars['String']['input']>;
 };
 
 
@@ -123,12 +215,29 @@ export type MutationUpdateDeviceArgs = {
 
 export type Query = {
   __typename?: 'Query';
+  getAlert?: Maybe<Alert>;
+  getAlertStats: AlertStats;
+  getAlerts: Array<Alert>;
   getDevice?: Maybe<Device>;
   getDeviceHistory: DeviceHistoryResult;
   getDeviceReadings: Array<Reading>;
   getDeviceStats: DeviceStats;
   getDevices: Array<Device>;
+  getUnreadAlertCount: Scalars['Int']['output'];
   hello?: Maybe<Scalars['String']['output']>;
+};
+
+
+export type QueryGetAlertArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
+export type QueryGetAlertsArgs = {
+  deviceId?: InputMaybe<Scalars['ID']['input']>;
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+  unreadOnly?: InputMaybe<Scalars['Boolean']['input']>;
 };
 
 
@@ -163,6 +272,11 @@ export type QueryGetDevicesArgs = {
   location?: InputMaybe<Scalars['String']['input']>;
   offset?: InputMaybe<Scalars['Int']['input']>;
   status?: InputMaybe<DeviceStatus>;
+};
+
+
+export type QueryGetUnreadAlertCountArgs = {
+  deviceId?: InputMaybe<Scalars['ID']['input']>;
 };
 
 export type Reading = {
@@ -204,6 +318,11 @@ export type SimulatorStats = {
 
 export type Subscription = {
   __typename?: 'Subscription';
+  alertCreated: Alert;
+  alertDeleted: Alert;
+  alertResolved: Alert;
+  alertUpdated: Alert;
+  alertsBulkUpdated: BulkUpdateNotification;
   deviceStatusChanged: Device;
   ping: Scalars['String']['output'];
   temperatureUpdates: Reading;
@@ -317,7 +436,14 @@ export type DirectiveResolverFn<TResult = {}, TParent = {}, TContext = {}, TArgs
 
 /** Mapping between all available schema types and the resolvers types */
 export type ResolversTypes = ResolversObject<{
+  Alert: ResolverTypeWrapper<Alert>;
+  AlertSeverity: AlertSeverity;
+  AlertStats: ResolverTypeWrapper<AlertStats>;
+  AlertType: AlertType;
+  AlertTypeStats: ResolverTypeWrapper<AlertTypeStats>;
   Boolean: ResolverTypeWrapper<Scalars['Boolean']['output']>;
+  BulkUpdateNotification: ResolverTypeWrapper<BulkUpdateNotification>;
+  BulkUpdateResult: ResolverTypeWrapper<BulkUpdateResult>;
   CreateDeviceInput: CreateDeviceInput;
   CreateReadingInput: CreateReadingInput;
   DateTime: ResolverTypeWrapper<Scalars['DateTime']['output']>;
@@ -344,7 +470,12 @@ export type ResolversTypes = ResolversObject<{
 
 /** Mapping between all available schema types and the resolvers parents */
 export type ResolversParentTypes = ResolversObject<{
+  Alert: Alert;
+  AlertStats: AlertStats;
+  AlertTypeStats: AlertTypeStats;
   Boolean: Scalars['Boolean']['output'];
+  BulkUpdateNotification: BulkUpdateNotification;
+  BulkUpdateResult: BulkUpdateResult;
   CreateDeviceInput: CreateDeviceInput;
   CreateReadingInput: CreateReadingInput;
   DateTime: Scalars['DateTime']['output'];
@@ -367,11 +498,59 @@ export type ResolversParentTypes = ResolversObject<{
   UpdateDeviceInput: UpdateDeviceInput;
 }>;
 
+export type AlertResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Alert'] = ResolversParentTypes['Alert']> = ResolversObject<{
+  createdAt?: Resolver<ResolversTypes['DateTime'], ParentType, ContextType>;
+  device?: Resolver<ResolversTypes['Device'], ParentType, ContextType>;
+  deviceId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  isRead?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
+  isResolved?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
+  message?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  resolvedAt?: Resolver<Maybe<ResolversTypes['DateTime']>, ParentType, ContextType>;
+  resolvedBy?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  severity?: Resolver<ResolversTypes['AlertSeverity'], ParentType, ContextType>;
+  title?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  type?: Resolver<ResolversTypes['AlertType'], ParentType, ContextType>;
+  updatedAt?: Resolver<ResolversTypes['DateTime'], ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+}>;
+
+export type AlertStatsResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['AlertStats'] = ResolversParentTypes['AlertStats']> = ResolversObject<{
+  byType?: Resolver<ResolversTypes['AlertTypeStats'], ParentType, ContextType>;
+  critical?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  resolved?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  total?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  unread?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  warning?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+}>;
+
+export type AlertTypeStatsResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['AlertTypeStats'] = ResolversParentTypes['AlertTypeStats']> = ResolversObject<{
+  CONNECTION_LOST?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  DEVICE_OFFLINE?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  LOW_BATTERY?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  TEMPERATURE_EXCURSION?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+}>;
+
+export type BulkUpdateNotificationResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['BulkUpdateNotification'] = ResolversParentTypes['BulkUpdateNotification']> = ResolversObject<{
+  action?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  alertIds?: Resolver<Array<ResolversTypes['ID']>, ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+}>;
+
+export type BulkUpdateResultResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['BulkUpdateResult'] = ResolversParentTypes['BulkUpdateResult']> = ResolversObject<{
+  count?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  success?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+}>;
+
 export interface DateTimeScalarConfig extends GraphQLScalarTypeConfig<ResolversTypes['DateTime'], any> {
   name: 'DateTime';
 }
 
 export type DeviceResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Device'] = ResolversParentTypes['Device']> = ResolversObject<{
+  alerts?: Resolver<Array<ResolversTypes['Alert']>, ParentType, ContextType>;
   battery?: Resolver<Maybe<ResolversTypes['Float']>, ParentType, ContextType>;
   createdAt?: Resolver<ResolversTypes['DateTime'], ParentType, ContextType>;
   deviceId?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
@@ -386,6 +565,7 @@ export type DeviceResolvers<ContextType = GraphQLContext, ParentType extends Res
   name?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   readings?: Resolver<Array<ResolversTypes['Reading']>, ParentType, ContextType>;
   status?: Resolver<ResolversTypes['DeviceStatus'], ParentType, ContextType>;
+  unreadAlertCount?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
   updatedAt?: Resolver<ResolversTypes['DateTime'], ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 }>;
@@ -410,7 +590,12 @@ export type DeviceStatsResolvers<ContextType = GraphQLContext, ParentType extend
 export type MutationResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Mutation'] = ResolversParentTypes['Mutation']> = ResolversObject<{
   createDevice?: Resolver<ResolversTypes['Device'], ParentType, ContextType, RequireFields<MutationCreateDeviceArgs, 'input'>>;
   createReading?: Resolver<ResolversTypes['Reading'], ParentType, ContextType, RequireFields<MutationCreateReadingArgs, 'input'>>;
+  deleteAlert?: Resolver<ResolversTypes['Alert'], ParentType, ContextType, RequireFields<MutationDeleteAlertArgs, 'id'>>;
   getSimulatorStats?: Resolver<ResolversTypes['SimulatorStats'], ParentType, ContextType>;
+  markAlertAsRead?: Resolver<ResolversTypes['Alert'], ParentType, ContextType, RequireFields<MutationMarkAlertAsReadArgs, 'id'>>;
+  markMultipleAlertsAsRead?: Resolver<ResolversTypes['BulkUpdateResult'], ParentType, ContextType, RequireFields<MutationMarkMultipleAlertsAsReadArgs, 'ids'>>;
+  rechargeBattery?: Resolver<ResolversTypes['SimulatorResult'], ParentType, ContextType, Partial<MutationRechargeBatteryArgs>>;
+  resolveAlert?: Resolver<ResolversTypes['Alert'], ParentType, ContextType, RequireFields<MutationResolveAlertArgs, 'id'>>;
   returnToNormal?: Resolver<ResolversTypes['SimulatorResult'], ParentType, ContextType>;
   simulateBatchArrival?: Resolver<ResolversTypes['SimulatorResult'], ParentType, ContextType>;
   simulateLowBattery?: Resolver<ResolversTypes['SimulatorResult'], ParentType, ContextType, Partial<MutationSimulateLowBatteryArgs>>;
@@ -421,11 +606,15 @@ export type MutationResolvers<ContextType = GraphQLContext, ParentType extends R
 }>;
 
 export type QueryResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Query'] = ResolversParentTypes['Query']> = ResolversObject<{
+  getAlert?: Resolver<Maybe<ResolversTypes['Alert']>, ParentType, ContextType, RequireFields<QueryGetAlertArgs, 'id'>>;
+  getAlertStats?: Resolver<ResolversTypes['AlertStats'], ParentType, ContextType>;
+  getAlerts?: Resolver<Array<ResolversTypes['Alert']>, ParentType, ContextType, RequireFields<QueryGetAlertsArgs, 'limit' | 'offset' | 'unreadOnly'>>;
   getDevice?: Resolver<Maybe<ResolversTypes['Device']>, ParentType, ContextType, RequireFields<QueryGetDeviceArgs, 'id'>>;
   getDeviceHistory?: Resolver<ResolversTypes['DeviceHistoryResult'], ParentType, ContextType, RequireFields<QueryGetDeviceHistoryArgs, 'deviceId' | 'limit' | 'timeRange'>>;
   getDeviceReadings?: Resolver<Array<ResolversTypes['Reading']>, ParentType, ContextType, RequireFields<QueryGetDeviceReadingsArgs, 'deviceId' | 'limit'>>;
   getDeviceStats?: Resolver<ResolversTypes['DeviceStats'], ParentType, ContextType, RequireFields<QueryGetDeviceStatsArgs, 'deviceId'>>;
   getDevices?: Resolver<Array<ResolversTypes['Device']>, ParentType, ContextType, RequireFields<QueryGetDevicesArgs, 'limit' | 'offset'>>;
+  getUnreadAlertCount?: Resolver<ResolversTypes['Int'], ParentType, ContextType, Partial<QueryGetUnreadAlertCountArgs>>;
   hello?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
 }>;
 
@@ -461,6 +650,11 @@ export type SimulatorStatsResolvers<ContextType = GraphQLContext, ParentType ext
 }>;
 
 export type SubscriptionResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Subscription'] = ResolversParentTypes['Subscription']> = ResolversObject<{
+  alertCreated?: SubscriptionResolver<ResolversTypes['Alert'], "alertCreated", ParentType, ContextType>;
+  alertDeleted?: SubscriptionResolver<ResolversTypes['Alert'], "alertDeleted", ParentType, ContextType>;
+  alertResolved?: SubscriptionResolver<ResolversTypes['Alert'], "alertResolved", ParentType, ContextType>;
+  alertUpdated?: SubscriptionResolver<ResolversTypes['Alert'], "alertUpdated", ParentType, ContextType>;
+  alertsBulkUpdated?: SubscriptionResolver<ResolversTypes['BulkUpdateNotification'], "alertsBulkUpdated", ParentType, ContextType>;
   deviceStatusChanged?: SubscriptionResolver<ResolversTypes['Device'], "deviceStatusChanged", ParentType, ContextType>;
   ping?: SubscriptionResolver<ResolversTypes['String'], "ping", ParentType, ContextType>;
   temperatureUpdates?: SubscriptionResolver<ResolversTypes['Reading'], "temperatureUpdates", ParentType, ContextType, Partial<SubscriptionTemperatureUpdatesArgs>>;
@@ -482,6 +676,11 @@ export type TimeRangeInfoResolvers<ContextType = GraphQLContext, ParentType exte
 }>;
 
 export type Resolvers<ContextType = GraphQLContext> = ResolversObject<{
+  Alert?: AlertResolvers<ContextType>;
+  AlertStats?: AlertStatsResolvers<ContextType>;
+  AlertTypeStats?: AlertTypeStatsResolvers<ContextType>;
+  BulkUpdateNotification?: BulkUpdateNotificationResolvers<ContextType>;
+  BulkUpdateResult?: BulkUpdateResultResolvers<ContextType>;
   DateTime?: GraphQLScalarType;
   Device?: DeviceResolvers<ContextType>;
   DeviceHistoryResult?: DeviceHistoryResultResolvers<ContextType>;
