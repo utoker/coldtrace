@@ -1,5 +1,5 @@
 import { prisma } from '@coldtrace/database';
-import { pubsub } from '../lib/pubsub';
+import { pubsub } from '../lib/pubsub.js';
 
 export interface SimulatorStats {
   totalReadings: number;

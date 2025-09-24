@@ -1,5 +1,11 @@
 import { config } from 'dotenv';
 import { resolve } from 'path';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+
+// Get __dirname equivalent for ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 // Load environment variables from .env file in the database package directory
 config({ path: resolve(__dirname, '../.env') });
@@ -13,10 +19,12 @@ function validateEnvironment() {
     console.error('2. Set DATABASE_URL to your PostgreSQL connection string');
     console.error('3. Started your PostgreSQL server');
     console.error('\nExample DATABASE_URL:');
-    console.error('DATABASE_URL="postgresql://username:password@localhost:5432/coldtrace?schema=public"');
+    console.error(
+      'DATABASE_URL="postgresql://username:password@localhost:5432/coldtrace?schema=public"'
+    );
     process.exit(1);
   }
-  
+
   console.log('✅ DATABASE_URL loaded successfully');
 }
 

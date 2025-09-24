@@ -1,10 +1,10 @@
 import { GraphQLError } from 'graphql';
 import { GraphQLScalarType, Kind } from 'graphql';
-import { GraphQLContext } from './context';
+import { GraphQLContext } from './context.js';
 import { PrismaClient } from '@coldtrace/database';
-import { simulatorService } from '../services/simulatorService';
-import { pubsub } from '../lib/pubsub';
-import { alertService } from '../services/alertService';
+import { simulatorService } from '../services/simulatorService.js';
+import { pubsub } from '../lib/pubsub.js';
+import { alertService } from '../services/alertService.js';
 import { createRequestLogger } from '@coldtrace/logger';
 
 // Helper function to calculate compliance rate

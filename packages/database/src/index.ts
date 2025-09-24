@@ -1,5 +1,5 @@
 // Load and validate environment variables first
-import './env';
+import './env.js';
 
 import { PrismaClient, Device, Reading } from '@prisma/client';
 

@@ -9,9 +9,9 @@ import { parse } from 'graphql';
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import { getAllowedOrigins } from '@coldtrace/env';
-import { typeDefs } from './graphql/schema';
-import { resolvers } from './graphql/resolvers';
-import { createContext, GraphQLContext } from './graphql/context';
+import { typeDefs } from './graphql/schema.js';
+import { resolvers } from './graphql/resolvers.js';
+import { createContext, GraphQLContext } from './graphql/context.js';
 
 // Configuration
 const SERVER_CONFIG = {

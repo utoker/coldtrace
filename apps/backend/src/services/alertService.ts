@@ -4,7 +4,7 @@ import {
   AlertSeverity,
   Alert,
 } from '@coldtrace/database';
-import { pubsub } from '../lib/pubsub';
+import { pubsub } from '../lib/pubsub.js';
 
 interface CreateAlertInput {
   deviceId: string;
