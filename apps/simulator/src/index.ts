@@ -176,13 +176,6 @@ class VaccineSimulator {
     this.rl.on('line', (input: string) => {
       const command = input.trim().toLowerCase();
 
-      // Debug logging to help troubleshoot
-      console.log(
-        chalk.magenta(
-          `[DEBUG] Received command: "${command}" (length: ${command.length})`
-        )
-      );
-
       switch (command) {
         case 'e':
           this.triggerExcursion();
@@ -197,7 +190,6 @@ class VaccineSimulator {
           this.returnToNormal();
           break;
         case 's':
-          console.log(chalk.magenta('[DEBUG] Executing showCurrentStats()'));
           this.showCurrentStats();
           break;
         case 'q':
@@ -271,7 +263,7 @@ class VaccineSimulator {
         devices.forEach((device) => {
           this.devices.set(device.id, {
             ...device,
-            battery: 100.0, // Start with full battery
+            battery: 85 + Math.random() * 15, // Start with 85-100% battery
             isOnline: true,
             lastReadingTime: new Date(),
             // Demo-specific fields
@@ -412,17 +404,22 @@ class VaccineSimulator {
   }
 
   private startSimulation(): void {
-    console.log(chalk.green('🚀 Starting vaccine monitoring simulation...'));
-    console.log(chalk.blue('📊 Sending readings every 10 minutes...\n'));
+    const intervalMinutes = Number(process.env.SIM_INTERVAL_MINUTES || 10);
+    const runOnce = process.env.SIM_RUN_ONCE === 'true';
 
-    this.intervalId = setInterval(async () => {
+    console.log(chalk.green('🚀 Starting vaccine monitoring simulation...'));
+    console.log(
+      chalk.blue(`📊 Sending readings every ${intervalMinutes} minutes...\n`)
+    );
+
+    const tick = async () => {
       if (this.isShuttingDown) return;
 
       const promises = Array.from(this.devices.entries()).map(
         async ([_deviceId, device]) => {
-          // Update battery level (decreases by 0.1% per reading, now every 10 minutes) - only for online devices
+          // Update battery level (decreases by 0.5% per reading, now every 10 minutes) - only for online devices
           if (device.isOnline) {
-            device.battery = Math.max(0, device.battery - 0.1);
+            device.battery = Math.max(0, device.battery - 0.5); // Increased drain rate: 0.5% every 10 minutes (3% per hour)
           }
           device.lastReadingTime = new Date();
 
@@ -503,7 +500,18 @@ class VaccineSimulator {
           )
         );
       }
-    }, 600000); // Send readings every 10 minutes
+    };
+
+    // Run immediately once if requested, then exit
+    if (runOnce) {
+      tick()
+        .then(() => this.gracefulShutdown())
+        .catch((_e) => this.gracefulShutdown());
+      return;
+    }
+
+    // Schedule interval
+    this.intervalId = setInterval(tick, intervalMinutes * 60 * 1000);
   }
 
   private displayFinalStats(): void {
@@ -692,7 +700,10 @@ class VaccineSimulator {
     const devicesToActivate = offlineDevices.slice(0, 3);
     devicesToActivate.forEach((device) => {
       device.isOnline = true;
-      device.battery = 85 + Math.random() * 15; // 85-100%
+      // Only reset battery if it's critically low (< 20%) to simulate charging
+      if (device.battery < 20) {
+        device.battery = 85 + Math.random() * 15; // Reset to 85-100% range
+      }
       device.demoMode = null;
     });
 
@@ -723,7 +734,11 @@ class VaccineSimulator {
         device.isInExcursion = false;
         device.targetTemperature = 5.0;
         device.demoMode = null;
-        device.battery = Math.max(device.battery, 85 + Math.random() * 15);
+
+        // Only reset battery if it's critically low (< 20%) to simulate charging
+        if (device.battery < 20) {
+          device.battery = Math.min(100, 85 + Math.random() * 15); // Reset to 85-100% range
+        }
         changesCount++;
       }
     });

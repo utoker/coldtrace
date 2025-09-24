@@ -3,7 +3,6 @@ import { SimulatorControls } from '@/components/SimulatorControls';
 import { MapView } from '@/components/MapView';
 import { DeviceGrid } from '@/components/DeviceGrid';
 import { Footer } from '@/components/Footer';
-import { DashboardStats } from '@/components/DashboardStats';
 import { AlertSystem } from '@/components/AlertSystem';
 
 export default function Home() {
@@ -28,21 +27,20 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Dashboard Stats */}
-      <div className="max-w-7xl mx-auto px-6 py-6">
-        <DashboardStats />
-      </div>
-
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-6 space-y-16 pb-24">
-        {/* Simulator Controls */}
+      <div className="max-w-7xl mx-auto px-6 space-y-16 p-24">
+        {/* Map and Controls Side-by-Side */}
         <section>
-          <SimulatorControls />
-        </section>
-
-        {/* Map View */}
-        <section>
-          <MapView />
+          <div className="bg-white/60 backdrop-blur-xl rounded-3xl shadow-apple border border-white/20 overflow-hidden">
+            <div className="grid grid-cols-1 lg:grid-cols-3 h-[600px]">
+              <div className="lg:col-span-2 border-r border-gray-100/50">
+                <MapView />
+              </div>
+              <div className="lg:col-span-1">
+                <SimulatorControls />
+              </div>
+            </div>
+          </div>
         </section>
 
         {/* Device Cards */}

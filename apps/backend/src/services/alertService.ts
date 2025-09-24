@@ -233,10 +233,18 @@ export class AlertService {
         }),
       ]);
 
-    const byType = byTypeResults.reduce((acc, item) => {
-      acc[item.type] = item._count.type;
-      return acc;
-    }, {} as Record<AlertType, number>);
+    // Initialize all alert types with 0 to ensure non-nullable fields
+    const byType: Record<AlertType, number> = {
+      TEMPERATURE_EXCURSION: 0,
+      DEVICE_OFFLINE: 0,
+      LOW_BATTERY: 0,
+      CONNECTION_LOST: 0,
+    };
+
+    // Update with actual counts
+    byTypeResults.forEach((item) => {
+      byType[item.type] = item._count.type;
+    });
 
     return {
       total,

@@ -160,18 +160,15 @@ export function DeviceGrid() {
   // WebSocket connection monitoring
   useEffect(() => {
     const handleWSConnected = () => {
-      console.log('✅ DeviceGrid: WebSocket connected');
       setWsConnected(true);
       setSubscriptionErrors(0);
     };
 
     const handleWSError = () => {
-      console.log('❌ DeviceGrid: WebSocket error detected');
       setWsConnected(false);
     };
 
     const handleWSClosed = () => {
-      console.log('🔌 DeviceGrid: WebSocket connection closed');
       setWsConnected(false);
     };
 
@@ -220,9 +217,6 @@ export function DeviceGrid() {
 
         // Mark WebSocket as working when we receive data
         if (!wsConnected) {
-          console.log(
-            '✅ DeviceGrid: WebSocket working - received temperature update'
-          );
           setWsConnected(true);
           setSubscriptionErrors(0);
         }
@@ -262,9 +256,6 @@ export function DeviceGrid() {
 
         // Mark WebSocket as working when we receive data
         if (!wsConnected) {
-          console.log(
-            '✅ DeviceGrid: WebSocket working - received device status update'
-          );
           setWsConnected(true);
           setSubscriptionErrors(0);
         }
@@ -454,7 +445,7 @@ export function DeviceGrid() {
 
       {/* Device Grid/List */}
       {view === 'grid' ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
           {devices.map((device) => (
             <DeviceCard
               key={device.id}

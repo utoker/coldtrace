@@ -10,11 +10,13 @@ This guide explains how to set up ColdTrace for local development using Docker.
 ## Quick Start
 
 1. **Start Docker services:**
+
    ```bash
    pnpm docker:up
    ```
 
 2. **Set up database:**
+
    ```bash
    pnpm db:setup
    ```
@@ -27,13 +29,15 @@ This guide explains how to set up ColdTrace for local development using Docker.
 ## Docker Services
 
 ### PostgreSQL 17
+
 - **Port:** 5432
 - **Database:** coldtrace
-- **Username:** coldtrace  
+- **Username:** coldtrace
 - **Password:** password
 - **Health checks:** Enabled with auto-restart
 
 ### Adminer (Database Admin)
+
 - **URL:** http://localhost:8080
 - **Server:** postgres (use container name, not localhost)
 - **Username:** coldtrace
@@ -43,6 +47,7 @@ This guide explains how to set up ColdTrace for local development using Docker.
 ## Available Scripts
 
 ### Docker Management
+
 - `pnpm docker:up` - Start all Docker services
 - `pnpm docker:down` - Stop Docker services
 - `pnpm docker:reset` - Reset containers and volumes
@@ -51,6 +56,7 @@ This guide explains how to set up ColdTrace for local development using Docker.
 - `pnpm docker:adminer` - Show Adminer connection info
 
 ### Database Operations
+
 - `pnpm db:setup` - Start Docker + setup database
 - `pnpm db:reset` - Reset Docker + database from scratch
 
@@ -59,6 +65,26 @@ This guide explains how to set up ColdTrace for local development using Docker.
 - `.env` - Default development environment (Docker)
 - `.env.local` - Local Docker development settings
 - `.env.production.example` - Production template
+
+### Production Environment (Vercel + Render/Railway + Supabase)
+
+Set these variables in your deployment platforms:
+
+- Backend (Render/Railway Web Service)
+
+  - `DATABASE_URL` = Supabase Postgres connection string
+  - `ALLOWED_ORIGINS` = `https://your-frontend.vercel.app,https://www.yourdomain.com`
+  - `PORT` = (optional) service-assigned or `4000`
+
+- Frontend (Vercel)
+
+  - `NEXT_PUBLIC_GRAPHQL_ENDPOINT` = `https://<your-backend-domain>/graphql`
+  - `NEXT_PUBLIC_GRAPHQL_WS_ENDPOINT` = `wss://<your-backend-domain>/graphql`
+
+- Simulator (Render/Railway Worker or Cron)
+  - `GRAPHQL_ENDPOINT` = `https://<your-backend-domain>/graphql`
+  - `SIM_INTERVAL_MINUTES` = `120` (two hours)
+  - `SIM_RUN_ONCE` = `true` (only for cron-based single run)
 
 ## Architecture
 
@@ -90,11 +116,13 @@ This guide explains how to set up ColdTrace for local development using Docker.
 ## Troubleshooting
 
 ### Database Connection Issues
+
 - Ensure Docker is running: `docker ps`
 - Check container health: `docker compose ps`
 - View logs: `pnpm docker:logs`
 
 ### Reset Everything
+
 ```bash
 pnpm docker:down
 docker system prune -f
@@ -102,11 +130,13 @@ pnpm db:reset
 ```
 
 ### Port Conflicts
+
 If ports 5432 or 8080 are in use, update `docker-compose.yml`:
+
 ```yaml
 ports:
-  - "15432:5432"  # Use different host port
-  - "18080:8080"  # Use different host port
+  - '15432:5432' # Use different host port
+  - '18080:8080' # Use different host port
 ```
 
 ## Production Deployment

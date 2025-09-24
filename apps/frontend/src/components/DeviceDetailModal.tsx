@@ -128,7 +128,7 @@ export function DeviceDetailModal({
 
   useEffect(() => {
     if (readingsData) {
-      console.log('DeviceDetailModal: Readings query completed:', readingsData);
+      // Readings data loaded successfully
     }
   }, [readingsData]);
 

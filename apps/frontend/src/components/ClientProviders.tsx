@@ -1,22 +1,25 @@
-'use client'
+'use client';
 
-import dynamic from 'next/dynamic'
-import { ReactNode } from 'react'
-import { HydrationBoundary } from './HydrationBoundary'
-import { Toaster } from 'sonner'
-import { WebSocketProvider } from '@/contexts/WebSocketContext'
+import dynamic from 'next/dynamic';
+import { ReactNode } from 'react';
+import { HydrationBoundary } from './HydrationBoundary';
+import { Toaster } from 'sonner';
+import { WebSocketProvider } from '@/contexts/WebSocketContext';
 
 interface ClientProvidersProps {
-  children: ReactNode
+  children: ReactNode;
 }
 
 // Dynamically import Apollo Provider to avoid SSR issues
 const DynamicApolloProvider = dynamic(
-  () => import('@/components/ApolloProvider').then(mod => ({ default: mod.ApolloProviderWrapper })),
+  () =>
+    import('@/components/ApolloProvider').then((mod) => ({
+      default: mod.ApolloProviderWrapper,
+    })),
   {
     ssr: false,
   }
-)
+);
 
 export function ClientProviders({ children }: ClientProvidersProps) {
   return (
@@ -29,7 +32,9 @@ export function ClientProviders({ children }: ClientProvidersProps) {
               <div className="h-3 w-24 mx-auto mb-2 bg-gray-400 rounded"></div>
               <div className="h-2 w-16 mx-auto bg-gray-300 rounded"></div>
             </div>
-            <p className="text-gray-800 mt-4 font-medium">Loading ColdTrace...</p>
+            <p className="text-gray-800 mt-4 font-medium">
+              Loading ColdTrace...
+            </p>
           </div>
         </div>
       }
@@ -37,7 +42,7 @@ export function ClientProviders({ children }: ClientProvidersProps) {
       <DynamicApolloProvider>
         <WebSocketProvider>
           {children}
-          <Toaster 
+          <Toaster
             position="top-right"
             expand={true}
             richColors={true}
@@ -47,13 +52,14 @@ export function ClientProviders({ children }: ClientProvidersProps) {
                 background: 'white',
                 border: '1px solid #e5e7eb',
                 padding: '16px',
-                boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-                zIndex: 9999
-              }
+                boxShadow:
+                  '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+                zIndex: 9999,
+              },
             }}
           />
         </WebSocketProvider>
       </DynamicApolloProvider>
     </HydrationBoundary>
-  )
+  );
 }

@@ -8,19 +8,20 @@ import { makeExecutableSchema } from '@graphql-tools/schema';
 import { parse } from 'graphql';
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
+import { getAllowedOrigins } from '@coldtrace/env';
 import { typeDefs } from './graphql/schema';
 import { resolvers } from './graphql/resolvers';
 import { createContext, GraphQLContext } from './graphql/context';
 
 // Configuration
 const SERVER_CONFIG = {
-  PORT: 4000,
-  ALLOWED_ORIGINS: [
+  PORT: Number(process.env.PORT || 4000),
+  ALLOWED_ORIGINS: getAllowedOrigins([
     'http://localhost:3000',
     'http://localhost:3001',
     'http://127.0.0.1:3000',
     'http://127.0.0.1:3001',
-  ],
+  ]),
 } as const;
 
 async function startServer() {
@@ -41,14 +42,14 @@ async function startServer() {
     path: '/graphql',
     verifyClient: (info: any) => {
       const origin = info.origin;
-
-      // Allow connections from allowed origins
-      if (!origin || ALLOWED_ORIGINS.includes(origin)) {
-        return true;
+      // In production, require a valid origin; in dev, allow missing origin for local tools
+      const isAllowed = origin
+        ? ALLOWED_ORIGINS.includes(origin)
+        : process.env.NODE_ENV !== 'production';
+      if (!isAllowed) {
+        console.log(`❌ WebSocket connection rejected from origin: ${origin}`);
       }
-
-      console.log(`❌ WebSocket connection rejected from origin: ${origin}`);
-      return false;
+      return isAllowed;
     },
   });
 
@@ -104,7 +105,7 @@ async function startServer() {
   // Create Apollo Server instance
   const server = new ApolloServer<GraphQLContext>({
     schema,
-    introspection: true,
+    introspection: process.env.NODE_ENV !== 'production',
     plugins: [
       ApolloServerPluginDrainHttpServer({ httpServer }),
       {
@@ -136,7 +137,13 @@ async function startServer() {
   app.use(
     '/graphql',
     cors({
-      origin: [...ALLOWED_ORIGINS],
+      origin: (origin, callback) => {
+        // Allow requests without Origin (SSR, server-to-server, health checks)
+        if (!origin) return callback(null, true);
+        if (ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
+        // Deny with no error to avoid opaque network failures in browsers
+        return callback(null, false);
+      },
       credentials: true,
     }),
     express.json(),

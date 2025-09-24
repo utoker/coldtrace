@@ -189,12 +189,6 @@ class SimulatorService {
         { prisma }
       );
 
-      console.log(
-        `🌡️ SimulatorService: Created temperature excursion reading for ${
-          device?.name ?? 'Unknown device'
-        } at ${excursionTemp}°C`
-      );
-
       return {
         success: true,
         message: `Temperature excursion triggered on ${device!.name} (12°C)`,
@@ -265,12 +259,6 @@ class SimulatorService {
           },
         },
         { prisma }
-      );
-
-      console.log(
-        `🔋 SimulatorService: Created low battery reading for ${
-          device!.name
-        } with ${lowBattery.toFixed(1)}% battery`
       );
 
       // Get the updated device with new battery level
@@ -353,9 +341,6 @@ class SimulatorService {
       });
 
       // Publish device status change
-      console.log(
-        `📡 Publishing device status change: ${device!.name} -> OFFLINE`
-      );
       pubsub.publish('DEVICE_STATUS_CHANGED', {
         deviceStatusChanged: updatedDevice,
       });
@@ -438,10 +423,6 @@ class SimulatorService {
               deviceStatusChanged: device,
             });
           });
-
-          console.log(
-            `🔌 POWER RESTORED: ${onlineDevices.length} devices back online`
-          );
         } catch (error) {
           console.error('Error restoring power:', error);
         }
@@ -551,7 +532,11 @@ class SimulatorService {
       // Get all devices that need to be reset
       const devicesToReset = await prisma.device.findMany({
         where: {
-          OR: [{ status: 'OFFLINE' }, { status: 'MAINTENANCE' }],
+          OR: [
+            { status: 'OFFLINE' },
+            { status: 'MAINTENANCE' },
+            { battery: { lt: 20 } }, // Also reset devices with low battery
+          ],
           isActive: true,
         },
       });

@@ -3,6 +3,7 @@
 import { Clock } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { AlertBell } from './AlertBell';
+import Link from 'next/link';
 
 export function Navbar() {
   const [currentTime, setCurrentTime] = useState('');
@@ -28,15 +29,21 @@ export function Navbar() {
               </h1>
             </div>
             <div className="hidden lg:flex items-center space-x-6">
-              <span className="text-sm font-medium text-gray-600">
+              <Link
+                href="/"
+                prefetch
+                className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
+              >
                 Dashboard
-              </span>
-              <span className="text-sm font-medium text-gray-400">
+              </Link>
+              {/* Use Next.js Link for client-side transitions and prefetch */}
+              <Link
+                href="/analytics"
+                prefetch
+                className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
+              >
                 Analytics
-              </span>
-              <span className="text-sm font-medium text-gray-400">
-                Settings
-              </span>
+              </Link>
             </div>
           </div>
 

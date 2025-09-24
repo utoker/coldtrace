@@ -41,12 +41,17 @@ const createCache = () =>
   });
 
 // Create HTTP Link factory
-const createHttpLinkClient = () =>
-  new HttpLink({
-    uri:
-      process.env.NEXT_PUBLIC_GRAPHQL_ENDPOINT ||
-      'http://localhost:4000/graphql',
+const createHttpLinkClient = () => {
+  const endpoint = process.env.NEXT_PUBLIC_GRAPHQL_ENDPOINT;
+  if (process.env.NODE_ENV === 'production') {
+    if (!endpoint) {
+      throw new Error('NEXT_PUBLIC_GRAPHQL_ENDPOINT must be set in production');
+    }
+  }
+  return new HttpLink({
+    uri: endpoint || 'http://localhost:4000/graphql',
   });
+};
 
 // Create WebSocket Link factory (client-side only)
 const createWebSocketLink = (): GraphQLWsLink | null => {
@@ -56,9 +61,44 @@ const createWebSocketLink = (): GraphQLWsLink | null => {
 
   const wsUrl =
     process.env.NEXT_PUBLIC_GRAPHQL_WS_ENDPOINT ||
-    'ws://localhost:4000/graphql';
+    (process.env.NEXT_PUBLIC_GRAPHQL_ENDPOINT
+      ? process.env.NEXT_PUBLIC_GRAPHQL_ENDPOINT.replace('http', 'ws')
+      : 'ws://localhost:4000/graphql');
+  if (
+    process.env.NODE_ENV === 'production' &&
+    !process.env.NEXT_PUBLIC_GRAPHQL_WS_ENDPOINT
+  ) {
+    // In production, do not attempt WS with localhost fallback
+    return null;
+  }
 
   try {
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('🔌 Creating WebSocket client with URL:', wsUrl);
+    }
+
+    // Test WebSocket connection before creating GraphQL client
+    if (typeof window !== 'undefined') {
+      try {
+        const testWs = new WebSocket(wsUrl);
+        testWs.onopen = () => {
+          if (process.env.NODE_ENV !== 'production') {
+            console.log('✅ WebSocket test connection successful');
+          }
+          testWs.close();
+        };
+        testWs.onerror = (error) => {
+          if (process.env.NODE_ENV !== 'production') {
+            console.error('❌ WebSocket test connection failed:', error);
+          }
+        };
+      } catch (error) {
+        if (process.env.NODE_ENV !== 'production') {
+          console.error('❌ Failed to create test WebSocket:', error);
+        }
+      }
+    }
+
     const wsClient = createClient({
       url: wsUrl,
       connectionParams: {
@@ -94,20 +134,24 @@ const createWebSocketLink = (): GraphQLWsLink | null => {
           }
         },
         error: (error: unknown) => {
-          const errorObj = error as Error;
-          console.error('❌ GraphQL WebSocket error:', {
-            message: errorObj?.message || 'Unknown error',
-            name: errorObj?.name || 'WebSocketError',
-            stack: errorObj?.stack,
-            details: error,
-          });
+          if (process.env.NODE_ENV !== 'production') {
+            console.error('❌ GraphQL WebSocket error:', {
+              error,
+              errorType: typeof error,
+              errorConstructor: error?.constructor?.name,
+              message: error instanceof Error ? error.message : String(error),
+              name: error instanceof Error ? error.name : 'WebSocketError',
+              stack: error instanceof Error ? error.stack : undefined,
+              details: error,
+            });
+          }
           if (typeof window !== 'undefined') {
             window.__GRAPHQL_WS_CONNECTED__ = false;
             window.dispatchEvent(
               new CustomEvent('graphql-ws-error', {
                 detail: {
-                  message: errorObj?.message || 'Unknown WebSocket error',
-                  name: errorObj?.name || 'WebSocketError',
+                  message: (error as any)?.message || 'Unknown WebSocket error',
+                  name: (error as any)?.name || 'WebSocketError',
                   originalError: error,
                 },
               })
@@ -116,11 +160,13 @@ const createWebSocketLink = (): GraphQLWsLink | null => {
         },
         closed: (event: unknown) => {
           const closeEvent = event as CloseEvent;
-          console.warn('🔌 GraphQL WebSocket closed', {
-            code: closeEvent.code,
-            reason: closeEvent.reason,
-            wasClean: closeEvent.wasClean,
-          });
+          if (process.env.NODE_ENV !== 'production') {
+            console.warn('🔌 GraphQL WebSocket closed', {
+              code: closeEvent.code,
+              reason: closeEvent.reason,
+              wasClean: closeEvent.wasClean,
+            });
+          }
           if (typeof window !== 'undefined') {
             window.__GRAPHQL_WS_CONNECTED__ = false;
             window.dispatchEvent(
@@ -129,7 +175,9 @@ const createWebSocketLink = (): GraphQLWsLink | null => {
           }
         },
         connecting: () => {
-          // Connection in progress
+          if (process.env.NODE_ENV !== 'production') {
+            console.log('🔌 WebSocket: Connecting to GraphQL server...');
+          }
         },
       },
     });
@@ -137,7 +185,9 @@ const createWebSocketLink = (): GraphQLWsLink | null => {
     const wsLink = new GraphQLWsLink(wsClient);
     return wsLink;
   } catch (error) {
-    console.error('❌ WebSocket: Failed to create WebSocket link:', error);
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('❌ WebSocket: Failed to create WebSocket link:', error);
+    }
     return null;
   }
 };

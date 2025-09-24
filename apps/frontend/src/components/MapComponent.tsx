@@ -217,8 +217,18 @@ const MapComponent = memo(
           const getDeviceStatusColor = (device: Device): string => {
             if (device.status === 'OFFLINE') return '#6b7280'; // gray
             if (device.status === 'MAINTENANCE') return '#f59e0b'; // yellow
-            if (device.latestReading?.status === 'CRITICAL') return '#ef4444'; // red
-            if (device.latestReading?.status === 'WARNING') return '#f59e0b'; // orange
+
+            // Check battery level first (most critical)
+            if (device.battery < 5) return '#ef4444'; // red - critical battery
+            if (device.battery < 20) return '#f59e0b'; // orange - low battery warning
+
+            // Then check temperature status
+            if (device.latestReading?.status === 'CRITICAL') {
+              return '#ef4444'; // red
+            }
+            if (device.latestReading?.status === 'WARNING') {
+              return '#f59e0b'; // orange
+            }
             return '#10b981'; // green - normal
           };
 

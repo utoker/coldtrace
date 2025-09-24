@@ -38,17 +38,25 @@ async function calculateComplianceRate(
 function getReadingStatus(
   temperature: number,
   minTemp?: number | null,
-  maxTemp?: number | null
+  maxTemp?: number | null,
+  battery?: number | null
 ): string {
-  if (!minTemp || !maxTemp) return 'NORMAL';
+  // Check temperature first (temperature excursions take precedence)
+  if (minTemp && maxTemp) {
+    const tempDiff = Math.max(
+      Math.abs(temperature - minTemp),
+      Math.abs(temperature - maxTemp)
+    );
 
-  const tempDiff = Math.max(
-    Math.abs(temperature - minTemp),
-    Math.abs(temperature - maxTemp)
-  );
+    if (temperature < minTemp || temperature > maxTemp) {
+      return tempDiff > 2 ? 'CRITICAL' : 'WARNING';
+    }
+  }
 
-  if (temperature < minTemp || temperature > maxTemp) {
-    return tempDiff > 2 ? 'CRITICAL' : 'WARNING';
+  // Then check battery level (only if temperature is normal)
+  if (battery !== null && battery !== undefined) {
+    if (battery < 5) return 'CRITICAL'; // Very low battery - critical
+    if (battery < 20) return 'WARNING'; // Low battery - warning
   }
 
   return 'NORMAL';
@@ -113,7 +121,7 @@ export const resolvers = {
           orderBy: { createdAt: 'desc' },
           include: {
             readings: {
-              take: 1,
+              take: 1000, // Fetch up to 1000 readings per device
               orderBy: { timestamp: 'desc' },
             },
           },
@@ -434,7 +442,8 @@ export const resolvers = {
         const status = getReadingStatus(
           input.temperature,
           device.minTemp,
-          device.maxTemp
+          device.maxTemp,
+          input.battery
         );
 
         // Create the reading
@@ -462,10 +471,6 @@ export const resolvers = {
 
         // Also publish to device-specific channel for targeted subscriptions
         const deviceSpecificChannel = `TEMPERATURE_UPDATES_${readingWithStatus.deviceId}`;
-        console.log(
-          '📡 Publishing temperature update to device-specific channel:',
-          deviceSpecificChannel
-        );
         pubsub.publish(deviceSpecificChannel, {
           temperatureUpdates: readingWithStatus,
         });
@@ -652,10 +657,6 @@ export const resolvers = {
     temperatureUpdates: {
       subscribe: (_parent: any, args: any) => {
         const { deviceId } = args;
-        console.log(
-          '🔔 Setting up temperatureUpdates subscription for device:',
-          deviceId || 'ALL'
-        );
         return pubsub.asyncIterableIterator([
           deviceId ? `TEMPERATURE_UPDATES_${deviceId}` : 'TEMPERATURE_UPDATES',
         ]);
@@ -664,14 +665,12 @@ export const resolvers = {
 
     deviceStatusChanged: {
       subscribe: () => {
-        console.log('🔔 Setting up deviceStatusChanged subscription');
         return pubsub.asyncIterableIterator(['DEVICE_STATUS_CHANGED']);
       },
     },
 
     ping: {
       subscribe: () => {
-        console.log('🔔 Setting up ping subscription');
         return pubsub.asyncIterableIterator(['PING']);
       },
     },
@@ -679,35 +678,30 @@ export const resolvers = {
     // Alert Subscriptions
     alertCreated: {
       subscribe: () => {
-        console.log('🔔 Setting up alertCreated subscription');
         return pubsub.asyncIterableIterator(['ALERT_CREATED']);
       },
     },
 
     alertUpdated: {
       subscribe: () => {
-        console.log('🔔 Setting up alertUpdated subscription');
         return pubsub.asyncIterableIterator(['ALERT_UPDATED']);
       },
     },
 
     alertResolved: {
       subscribe: () => {
-        console.log('🔔 Setting up alertResolved subscription');
         return pubsub.asyncIterableIterator(['ALERT_RESOLVED']);
       },
     },
 
     alertDeleted: {
       subscribe: () => {
-        console.log('🔔 Setting up alertDeleted subscription');
         return pubsub.asyncIterableIterator(['ALERT_DELETED']);
       },
     },
 
     alertsBulkUpdated: {
       subscribe: () => {
-        console.log('🔔 Setting up alertsBulkUpdated subscription');
         return pubsub.asyncIterableIterator(['ALERTS_BULK_UPDATED']);
       },
     },
@@ -720,10 +714,29 @@ export const resolvers = {
       _args: any,
       { prisma }: GraphQLContext
     ) => {
-      return await prisma.reading.findFirst({
+      const reading = await prisma.reading.findFirst({
         where: { deviceId: parent.id },
         orderBy: { timestamp: 'desc' },
       });
+
+      if (!reading) return null;
+
+      // Calculate status based on temperature and battery
+      const device = await prisma.device.findUnique({
+        where: { id: parent.id },
+      });
+
+      const status = getReadingStatus(
+        reading.temperature,
+        device?.minTemp,
+        device?.maxTemp,
+        reading.battery
+      );
+
+      return {
+        ...reading,
+        status,
+      };
     },
 
     alerts: async (parent: any, _args: any, { prisma }: GraphQLContext) => {
@@ -762,19 +775,21 @@ export const resolvers = {
       const device = await prisma.device.findUnique({
         where: { id: parent.deviceId },
       });
-
       return getReadingStatus(
         parent.temperature,
         device?.minTemp,
-        device?.maxTemp
+        device?.maxTemp,
+        parent.battery
       );
     },
   },
 };
 
 // Set up ping timer for WebSocket testing
-setInterval(() => {
-  const timestamp = new Date().toISOString();
-  const message = `Ping at ${timestamp}`;
-  pubsub.publish('PING', { ping: message });
-}, 5000); // Every 5 seconds
+if (process.env.NODE_ENV !== 'production') {
+  setInterval(() => {
+    const timestamp = new Date().toISOString();
+    const message = `Ping at ${timestamp}`;
+    pubsub.publish('PING', { ping: message });
+  }, 5000); // Every 5 seconds
+}

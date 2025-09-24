@@ -10,11 +10,15 @@ import {
   Power,
   Thermometer,
   Zap,
-  ChevronDown,
-  ChevronUp,
   CheckCircle,
   XCircle,
 } from 'lucide-react';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 // GraphQL Mutations
 const TRIGGER_EXCURSION = gql`
@@ -69,19 +73,6 @@ const SIMULATE_POWER_OUTAGE = gql`
   }
 `;
 
-const SIMULATE_BATCH_ARRIVAL = gql`
-  mutation SimulateBatchArrival {
-    simulateBatchArrival {
-      success
-      message
-      affectedDevices {
-        id
-        name
-      }
-    }
-  }
-`;
-
 const RETURN_TO_NORMAL = gql`
   mutation ReturnToNormal {
     returnToNormal {
@@ -115,7 +106,6 @@ interface SimulationResult {
 }
 
 export function SimulatorControls() {
-  const [isExpanded, setIsExpanded] = useState(false);
   const [selectedDeviceId, setSelectedDeviceId] = useState('');
   const [lastResult, setLastResult] = useState<SimulationResult | null>(null);
 
@@ -128,9 +118,6 @@ export function SimulatorControls() {
     useMutation(TAKE_DEVICE_OFFLINE);
   const [simulatePowerOutage, { loading: powerLoading }] = useMutation(
     SIMULATE_POWER_OUTAGE
-  );
-  const [simulateBatchArrival, { loading: batchLoading }] = useMutation(
-    SIMULATE_BATCH_ARRIVAL
   );
   const [returnToNormal, { loading: normalLoading }] =
     useMutation(RETURN_TO_NORMAL);
@@ -153,9 +140,9 @@ export function SimulatorControls() {
   };
 
   return (
-    <div className="bg-white/60 backdrop-blur-xl rounded-3xl shadow-apple border border-white/20 overflow-hidden">
-      <div className="px-8 py-6 border-b border-gray-100/50">
-        <div className="flex items-center justify-between">
+    <TooltipProvider>
+      <div className="bg-white/60 backdrop-blur-xl border border-white/20 overflow-hidden h-full flex flex-col">
+        <div className="px-8 py-6 flex-shrink-0">
           <div className="flex items-center space-x-4">
             <div className="p-3 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl">
               <Activity className="h-6 w-6 text-white" />
@@ -169,23 +156,9 @@ export function SimulatorControls() {
               </p>
             </div>
           </div>
-
-          <button
-            onClick={() => setIsExpanded(!isExpanded)}
-            className="px-4 py-2 bg-gray-50 hover:bg-gray-100 rounded-full transition-colors duration-200 flex items-center space-x-2 text-sm font-medium text-gray-700"
-          >
-            <span>{isExpanded ? 'Hide' : 'Show'} Controls</span>
-            {isExpanded ? (
-              <ChevronUp className="h-4 w-4" />
-            ) : (
-              <ChevronDown className="h-4 w-4" />
-            )}
-          </button>
         </div>
-      </div>
 
-      {isExpanded && (
-        <div className="px-8 py-6 space-y-8">
+        <div className="px-8 py-6 space-y-8 flex-1 overflow-y-auto">
           {/* Last Result */}
           {lastResult && (
             <div
@@ -214,128 +187,164 @@ export function SimulatorControls() {
 
           {/* Device Selection */}
           <div className="space-y-2">
-            <label className="text-sm font-medium">
-              Target Device (DB id or deviceId; empty for random)
-            </label>
+            <label className="text-sm font-medium">Target Device ID</label>
             <input
               type="text"
               value={selectedDeviceId}
               onChange={(e) => setSelectedDeviceId(e.target.value)}
-              placeholder="Enter device ID or leave empty for random selection"
+              placeholder="Enter device ID or leave empty for random"
               className="w-full px-3 py-2 border border-input rounded-md text-sm bg-background"
             />
           </div>
 
           {/* Control Buttons */}
-          <div className="grid grid-cols-2 gap-4">
-            <button
-              onClick={() =>
-                handleMutation(triggerExcursion, {
-                  deviceId: selectedDeviceId || undefined,
-                })
-              }
-              disabled={excursionLoading}
-              className="flex items-center justify-start px-6 py-4 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-2xl hover:from-red-600 hover:to-red-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl transform hover:scale-[1.02]"
-            >
-              <Thermometer className="mr-3 h-5 w-5" />
-              <span className="font-medium">
-                {excursionLoading ? 'Triggering...' : 'Temperature Excursion'}
-              </span>
-            </button>
+          <div className="grid grid-cols-2 gap-2">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() =>
+                    handleMutation(triggerExcursion, {
+                      deviceId: selectedDeviceId || undefined,
+                    })
+                  }
+                  disabled={excursionLoading}
+                  className="flex items-center justify-start px-3 py-2 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-xl hover:from-red-600 hover:to-red-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-[1.02]"
+                >
+                  <Thermometer className="mr-2 h-4 w-4" />
+                  <span className="font-medium text-sm">
+                    {excursionLoading
+                      ? 'Triggering...'
+                      : 'Temperature Excursion'}
+                  </span>
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>
+                  Simulate a temperature excursion alert for the selected device
+                  (or random device if none selected)
+                </p>
+              </TooltipContent>
+            </Tooltip>
 
-            <button
-              onClick={() =>
-                handleMutation(simulateLowBattery, {
-                  deviceId: selectedDeviceId || undefined,
-                })
-              }
-              disabled={batteryLoading}
-              className="flex items-center justify-start px-6 py-4 bg-white border border-gray-200 text-gray-700 rounded-2xl hover:bg-gray-50 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl transform hover:scale-[1.02]"
-            >
-              <Battery className="mr-3 h-5 w-5" />
-              <span className="font-medium">
-                {batteryLoading ? 'Simulating...' : 'Low Battery'}
-              </span>
-            </button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() =>
+                    handleMutation(simulateLowBattery, {
+                      deviceId: selectedDeviceId || undefined,
+                    })
+                  }
+                  disabled={batteryLoading}
+                  className="flex items-center justify-start px-3 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-[1.02]"
+                >
+                  <Battery className="mr-2 h-4 w-4" />
+                  <span className="font-medium text-sm">
+                    {batteryLoading ? 'Simulating...' : 'Low Battery'}
+                  </span>
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>
+                  Simulate low battery warning for the selected device (or
+                  random device if none selected)
+                </p>
+              </TooltipContent>
+            </Tooltip>
 
-            <button
-              onClick={() =>
-                handleMutation(takeDeviceOffline, {
-                  deviceId: selectedDeviceId || undefined,
-                })
-              }
-              disabled={offlineLoading}
-              className="flex items-center justify-start px-6 py-4 bg-white border border-gray-200 text-gray-700 rounded-2xl hover:bg-gray-50 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl transform hover:scale-[1.02]"
-            >
-              <Power className="mr-3 h-5 w-5" />
-              <span className="font-medium">
-                {offlineLoading ? 'Taking Offline...' : 'Take Offline'}
-              </span>
-            </button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() =>
+                    handleMutation(takeDeviceOffline, {
+                      deviceId: selectedDeviceId || undefined,
+                    })
+                  }
+                  disabled={offlineLoading}
+                  className="flex items-center justify-start px-3 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-[1.02]"
+                >
+                  <Power className="mr-2 h-4 w-4" />
+                  <span className="font-medium text-sm">
+                    {offlineLoading ? 'Taking Offline...' : 'Take Offline'}
+                  </span>
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>
+                  Take the selected device offline (or random device if none
+                  selected)
+                </p>
+              </TooltipContent>
+            </Tooltip>
 
-            <button
-              onClick={() => handleMutation(simulatePowerOutage)}
-              disabled={powerLoading}
-              className="flex items-center justify-start px-6 py-4 bg-white border border-gray-200 text-gray-700 rounded-2xl hover:bg-gray-50 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl transform hover:scale-[1.02]"
-            >
-              <Zap className="mr-3 h-5 w-5" />
-              <span className="font-medium">
-                {powerLoading ? 'Simulating...' : 'Power Outage'}
-              </span>
-            </button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => handleMutation(simulatePowerOutage)}
+                  disabled={powerLoading}
+                  className="flex items-center justify-start px-3 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-[1.02]"
+                >
+                  <Zap className="mr-2 h-4 w-4" />
+                  <span className="font-medium text-sm">
+                    {powerLoading ? 'Simulating...' : 'Power Outage'}
+                  </span>
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>
+                  Simulate a power outage affecting ALL online devices
+                  (auto-recovery in 30 seconds)
+                </p>
+              </TooltipContent>
+            </Tooltip>
 
-            <button
-              onClick={() => handleMutation(simulateBatchArrival)}
-              disabled={batchLoading}
-              className="flex items-center justify-start px-6 py-4 bg-white border border-gray-200 text-gray-700 rounded-2xl hover:bg-gray-50 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl transform hover:scale-[1.02]"
-            >
-              <Activity className="mr-3 h-5 w-5" />
-              <span className="font-medium">
-                {batchLoading ? 'Simulating...' : 'Batch Arrival'}
-              </span>
-            </button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => handleMutation(returnToNormal)}
+                  disabled={normalLoading}
+                  className="flex items-center justify-start px-3 py-2 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-xl hover:from-green-600 hover:to-green-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-[1.02]"
+                >
+                  <CheckCircle className="mr-2 h-4 w-4" />
+                  <span className="font-medium text-sm">
+                    {normalLoading ? 'Resetting...' : 'Return to Normal'}
+                  </span>
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>
+                  Reset ALL devices to healthy state, clearing all simulated
+                  conditions and recharging batteries to 85-100%
+                </p>
+              </TooltipContent>
+            </Tooltip>
 
-            <button
-              onClick={() => handleMutation(returnToNormal)}
-              disabled={normalLoading}
-              className="flex items-center justify-start px-6 py-4 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-2xl hover:from-green-600 hover:to-green-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl transform hover:scale-[1.02]"
-            >
-              <CheckCircle className="mr-3 h-5 w-5" />
-              <span className="font-medium">
-                {normalLoading ? 'Resetting...' : 'Return to Normal'}
-              </span>
-            </button>
-
-            <button
-              onClick={() =>
-                handleMutation(rechargeBattery, {
-                  deviceId: selectedDeviceId || undefined,
-                })
-              }
-              disabled={rechargeLoading}
-              className="flex items-center justify-start px-6 py-4 bg-white border border-gray-200 text-gray-700 rounded-2xl hover:bg-gray-50 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl transform hover:scale-[1.02]"
-            >
-              <BatteryCharging className="mr-3 h-5 w-5" />
-              <span className="font-medium">
-                {rechargeLoading ? 'Recharging...' : 'Recharge Battery'}
-              </span>
-            </button>
-          </div>
-
-          {/* Help Text */}
-          <div className="text-xs text-muted-foreground bg-muted p-3 rounded-md">
-            <p className="font-medium mb-1">💡 Tips:</p>
-            <ul className="space-y-1 list-disc list-inside">
-              <li>Leave device ID empty to target a random device</li>
-              <li>
-                Power outage affects all online devices (auto-recovery in 30s)
-              </li>
-              <li>Batch arrival brings up to 3 offline devices online</li>
-              <li>Return to normal resets all devices to healthy state</li>
-            </ul>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() =>
+                    handleMutation(rechargeBattery, {
+                      deviceId: selectedDeviceId || undefined,
+                    })
+                  }
+                  disabled={rechargeLoading}
+                  className="flex items-center justify-start px-3 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-[1.02]"
+                >
+                  <BatteryCharging className="mr-2 h-4 w-4" />
+                  <span className="font-medium text-sm">
+                    {rechargeLoading ? 'Recharging...' : 'Recharge Battery'}
+                  </span>
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>
+                  Recharge battery for the selected device (or random device if
+                  none selected)
+                </p>
+              </TooltipContent>
+            </Tooltip>
           </div>
         </div>
-      )}
-    </div>
+      </div>
+    </TooltipProvider>
   );
 }

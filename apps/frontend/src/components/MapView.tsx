@@ -5,14 +5,8 @@ import { useQuery, useSubscription } from '@apollo/client/react';
 import { gql } from '@apollo/client';
 import dynamic from 'next/dynamic';
 import { DeviceDetailModal } from './DeviceDetailModal';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
 import { MapPin, Loader2 } from 'lucide-react';
+import { Card, CardContent } from './ui/card';
 
 // Dynamically import the entire map component to avoid SSR issues
 const DynamicMap = dynamic(() => import('./MapComponent'), {
@@ -148,22 +142,45 @@ export function MapView() {
 
       if (data?.data?.temperatureUpdates) {
         const tempUpdate = data.data.temperatureUpdates;
+        console.log(
+          '🌡️ MapView: Processing temperature update for device:',
+          tempUpdate.deviceId,
+          'Status:',
+          tempUpdate.status,
+          'Temp:',
+          tempUpdate.temperature
+        );
 
         // Update only the specific device's latest reading
-        setDevices((prevDevices) =>
-          prevDevices.map((device) =>
-            device.id === tempUpdate.deviceId
-              ? {
-                  ...device,
-                  latestReading: {
-                    temperature: tempUpdate.temperature,
-                    status: tempUpdate.status,
-                    timestamp: tempUpdate.timestamp,
-                  },
-                }
-              : device
-          )
-        );
+        setDevices((prevDevices) => {
+          const updatedDevices = prevDevices.map((device) => {
+            if (device.id === tempUpdate.deviceId) {
+              console.log(
+                '🔄 MapView: Updating device',
+                device.name,
+                'from',
+                device.latestReading?.status,
+                'to',
+                tempUpdate.status
+              );
+              return {
+                ...device,
+                latestReading: {
+                  temperature: tempUpdate.temperature,
+                  status: tempUpdate.status,
+                  timestamp: tempUpdate.timestamp,
+                },
+              };
+            }
+            return device;
+          });
+          console.log(
+            '📊 MapView: Updated devices array, devices with critical status:',
+            updatedDevices.filter((d) => d.latestReading?.status === 'CRITICAL')
+              .length
+          );
+          return updatedDevices;
+        });
       }
     },
   });
@@ -182,11 +199,26 @@ export function MapView() {
 
         // Update only the specific device in local state
         setDevices((prevDevices) => {
-          const newDevices = prevDevices.map((device) =>
-            device.id === updatedDevice.id
-              ? { ...device, ...updatedDevice }
-              : device
-          );
+          const newDevices = prevDevices.map((device) => {
+            if (device.id === updatedDevice.id) {
+              // Preserve the latestReading from temperature updates
+              const preservedLatestReading = device.latestReading;
+              const mergedDevice = { ...device, ...updatedDevice };
+
+              // If we have a preserved latestReading, use it instead of the one from updatedDevice
+              if (preservedLatestReading) {
+                mergedDevice.latestReading = preservedLatestReading;
+              }
+
+              console.log(
+                `🔄 MapView: Merging device ${updatedDevice.name} status to ${updatedDevice.status}, preserving latestReading:`,
+                preservedLatestReading
+              );
+
+              return mergedDevice;
+            }
+            return device;
+          });
           console.log(
             `📊 MapView: Updated devices array, changed device found: ${newDevices.some(
               (d) => d.id === updatedDevice.id
@@ -198,10 +230,40 @@ export function MapView() {
     },
   });
 
-  // Update devices when data changes
+  // Update devices when query data changes, but preserve any newer latestReading
   useEffect(() => {
     if (data?.getDevices) {
-      setDevices(data.getDevices);
+      setDevices((prev) => {
+        if (prev.length === 0) return data.getDevices;
+
+        const prevById = new Map(prev.map((d) => [d.id, d] as const));
+        return data.getDevices.map((incoming) => {
+          const existing = prevById.get(incoming.id);
+          if (!existing) return incoming;
+
+          const existingReading = existing.latestReading;
+          const incomingReading = incoming.latestReading;
+
+          // Decide which latestReading to keep (prefer the newer timestamp if both exist)
+          let mergedLatestReading = incomingReading;
+          if (existingReading) {
+            if (
+              !incomingReading ||
+              new Date(existingReading.timestamp).getTime() >=
+                new Date(incomingReading.timestamp).getTime()
+            ) {
+              mergedLatestReading = existingReading;
+            }
+          }
+
+          const merged: Device = { ...incoming } as Device;
+          if (mergedLatestReading) {
+            // Only set latestReading when we have a value to avoid setting undefined
+            (merged as any).latestReading = mergedLatestReading;
+          }
+          return merged;
+        });
+      });
     }
   }, [data]);
 
@@ -222,7 +284,9 @@ export function MapView() {
 
   // Memoize filtered devices to prevent unnecessary re-renders
   const devicesWithLocation = useMemo(() => {
-    return devices.filter((device) => device.latitude && device.longitude);
+    return devices.filter(
+      (device) => device.latitude != null && device.longitude != null
+    );
   }, [devices]);
 
   if (loading) {
@@ -254,18 +318,18 @@ export function MapView() {
   }
 
   return (
-    <Card>
-      <CardHeader>
+    <div className="h-full flex flex-col">
+      <div className="px-8 py-6 flex-shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <div className="bg-primary/10 p-2 rounded-lg">
               <MapPin className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <CardTitle>Device Map</CardTitle>
-              <CardDescription>
+              <h3 className="text-xl font-light text-gray-900">Device Map</h3>
+              <p className="text-gray-600 text-sm mt-1">
                 {devicesWithLocation.length} devices with location data
-              </CardDescription>
+              </p>
             </div>
           </div>
           <div className="flex items-center space-x-4 text-sm">
@@ -287,15 +351,14 @@ export function MapView() {
             </div>
           </div>
         </div>
-      </CardHeader>
+      </div>
 
-      <CardContent className="p-0">
+      <div className="flex-1 p-0">
         <DynamicMap
-          key="map-component"
           devices={devicesWithLocation}
           onDeviceClick={handleDeviceClick}
         />
-      </CardContent>
+      </div>
 
       {/* Device Detail Modal */}
       {selectedDevice && (
@@ -305,6 +368,6 @@ export function MapView() {
           onClose={handleModalClose}
         />
       )}
-    </Card>
+    </div>
   );
 }

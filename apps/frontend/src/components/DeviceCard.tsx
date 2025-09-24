@@ -122,7 +122,7 @@ export function DeviceCard({
     <div
       className={`
         bg-white rounded-lg shadow-md hover:shadow-lg transition-all duration-300
-        border-2 p-6 cursor-pointer
+        border-2 p-6 cursor-pointer w-full min-w-[280px]
         ${flashUpdate ? 'border-blue-400 shadow-lg' : 'border-gray-100'}
         ${isUpdating ? 'animate-pulse' : ''}
         ${onClick ? 'hover:border-blue-300 hover:shadow-xl' : ''}
