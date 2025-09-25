@@ -9,14 +9,9 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-
     strategy:
       matrix:
         node-version: [18, 20]
-
-    env:
-      DATABASE_URL: ${{ secrets.DATABASE_URL }}
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -53,6 +48,14 @@ jobs:
       - name: Run linter
         run: pnpm lint
 
+      - name: Set DATABASE_URL for all steps
+        run: echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" >> $GITHUB_ENV
+
+      - name: Create .env file for tests
+        run: |
+          echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" > .env
+          echo "Created .env file with DATABASE_URL"
+
       - name: Check environment variables
         run: |
           echo "🔍 Checking environment variables..."
@@ -61,15 +64,11 @@ jobs:
           if [ -n "$DATABASE_URL" ]; then
             echo "🔍 DATABASE_URL starts with: ${DATABASE_URL:0:20}..."
           fi
+          echo "🔍 .env file contents:"
+          cat .env
 
       - name: Run tests
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-        run: |
-          echo "Setting DATABASE_URL for test process..."
-          export DATABASE_URL="$DATABASE_URL"
-          echo "DATABASE_URL is now: $DATABASE_URL"
-          pnpm test
+        run: pnpm test
 
       - name: Run type check
         run: pnpm --filter @coldtrace/logger build && pnpm --filter @coldtrace/database build && pnpm --filter @coldtrace/types build
