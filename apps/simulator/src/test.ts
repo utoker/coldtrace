@@ -4,6 +4,9 @@ import chalk from 'chalk';
 // NO dotenv.config() needed - we get DATABASE_URL from GitHub Actions secrets!
 
 console.log("🚀 Test script starting...");
+console.log("🚀 Current working directory:", process.cwd());
+console.log("🚀 Process ID:", process.pid);
+console.log("🚀 Node version:", process.version);
 console.log("🚀 Environment check:");
 console.log("🚀 All env vars with DATABASE:", Object.keys(process.env).filter(key => key.includes("DATABASE")));
 console.log("🚀 DATABASE_URL from process.env:", process.env.DATABASE_URL ? "EXISTS" : "NOT EXISTS");
@@ -29,6 +32,10 @@ if (!process.env.DATABASE_URL) {
   console.log(chalk.red('🔍 Looking for DATABASE_URL in all possible forms...'));
   const dbVars = Object.keys(process.env).filter(key => key.includes("DATABASE") || key.includes("DB"));
   console.log(chalk.red('🔍 Database-related vars:', dbVars));
+  console.log(chalk.red('🔍 All environment variables:'));
+  for (const [key, value] of Object.entries(process.env)) {
+    console.log(chalk.red(`  ${key}: ${value}`));
+  }
   process.exit(1);
 }
 
