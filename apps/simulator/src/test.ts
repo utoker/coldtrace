@@ -1,4 +1,3 @@
-import { spawn, ChildProcess } from 'child_process';
 import { prisma } from '@coldtrace/database';
 import chalk from 'chalk';
 import dotenv from 'dotenv';
