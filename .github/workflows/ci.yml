@@ -106,6 +106,13 @@ jobs:
       - name: Build packages
         run: pnpm build
 
+      - name: Seed database with test data
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          echo "🌱 Seeding database with test data..."
+          pnpm --filter @coldtrace/database db:seed
+
       - name: Test simulator manually
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
