@@ -19,10 +19,6 @@ for (const [key, value] of Object.entries(process.env)) {
   console.log(`  ${key}: ${value}`);
 }
 
-// Force output flush
-process.stdout.write('\n');
-process.stdout.flush();
-
 console.log("🚀 Environment check:");
 console.log("🚀 All env vars with DATABASE:", Object.keys(process.env).filter(key => key.includes("DATABASE")));
 console.log("🚀 DATABASE_URL from process.env:", process.env.DATABASE_URL ? "EXISTS" : "NOT EXISTS");
@@ -45,9 +41,6 @@ if (!process.env.DATABASE_URL) {
     console.log(`  ${key}: ${value}`);
   }
   
-  // Force output flush before exit
-  process.stdout.write('\n');
-  process.stdout.flush();
   process.exit(1);
 }
 
