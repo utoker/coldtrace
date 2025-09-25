@@ -1,10 +1,7 @@
 import { prisma } from '@coldtrace/database';
 import chalk from 'chalk';
-import dotenv from 'dotenv';
 
-// CRITICAL: Load environment variables FIRST before any other imports
-// This fixes the tsx environment variable inheritance issue
-dotenv.config();
+// NO dotenv.config() needed - we get DATABASE_URL from GitHub Actions secrets!
 
 console.log("🚀 Test script starting...");
 console.log("🚀 Environment check:");
@@ -25,13 +22,7 @@ if (process.env.DATABASE_URL) {
 
 if (!process.env.DATABASE_URL) {
   console.log(chalk.red('❌ DATABASE_URL environment variable is not set'));
-  console.log(chalk.red('Please ensure you have:'));
-  console.log(chalk.red('1. Created a .env file in packages/database/'));
-  console.log(chalk.red('2. Set DATABASE_URL to your PostgreSQL connection string'));
-  console.log(chalk.red('3. Started your PostgreSQL server'));
-  console.log(chalk.red(''));
-  console.log(chalk.red('Example DATABASE_URL:'));
-  console.log(chalk.red('DATABASE_URL="postgresql://username:password@localhost:5432/coldtrace?schema=public"'));
+  console.log(chalk.red('This should come from GitHub Actions secrets!'));
   console.log(chalk.red(''));
   console.log(chalk.red('🔍 Available environment variables:'));
   console.log(chalk.red(Object.keys(process.env).sort().join(", ")));

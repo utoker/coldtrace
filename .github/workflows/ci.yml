@@ -48,14 +48,6 @@ jobs:
       - name: Run linter
         run: pnpm lint
 
-      - name: Set DATABASE_URL for all steps
-        run: echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" >> $GITHUB_ENV
-
-      - name: Create .env file for tests
-        run: |
-          echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" > .env
-          echo "Created .env file with DATABASE_URL"
-
       - name: Check environment variables
         run: |
           echo "🔍 Checking environment variables..."
@@ -64,11 +56,14 @@ jobs:
           if [ -n "$DATABASE_URL" ]; then
             echo "🔍 DATABASE_URL starts with: ${DATABASE_URL:0:20}..."
           fi
-          echo "🔍 .env file contents:"
-          cat .env
 
-      - name: Run tests
-        run: pnpm test
+      - name: Run tests with explicit environment
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          echo "Running tests with explicit DATABASE_URL..."
+          echo "DATABASE_URL is: $DATABASE_URL"
+          pnpm test
 
       - name: Run type check
         run: pnpm --filter @coldtrace/logger build && pnpm --filter @coldtrace/database build && pnpm --filter @coldtrace/types build
