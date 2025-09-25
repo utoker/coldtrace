@@ -60,7 +60,7 @@ async function testDatabaseConnection() {
     
   } catch (error) {
     console.log(chalk.red('❌ Database connection failed:'));
-    console.log(chalk.red(error));
+    console.log(chalk.red(error instanceof Error ? error.message : String(error)));
     process.exit(1);
   }
 }
@@ -103,7 +103,7 @@ async function testGraphQLEndpoint() {
     
   } catch (error) {
     console.log(chalk.yellow('⚠️ GraphQL endpoint test failed (this is expected in CI):'));
-    console.log(chalk.yellow(error.message));
+    console.log(chalk.yellow(error instanceof Error ? error.message : String(error)));
   }
 }
 
@@ -120,6 +120,11 @@ async function testSimulator() {
     }
 
     const device = devices[0];
+    if (!device) {
+      console.log(chalk.yellow('⚠️ No device found - skipping simulator test'));
+      return;
+    }
+    
     console.log(chalk.green(`✅ Testing with device: ${device.name}`));
     
     // Test reading creation
@@ -143,7 +148,7 @@ async function testSimulator() {
     
   } catch (error) {
     console.log(chalk.red('❌ Simulator test failed:'));
-    console.log(chalk.red(error));
+    console.log(chalk.red(error instanceof Error ? error.message : String(error)));
     process.exit(1);
   }
 }
@@ -175,6 +180,6 @@ process.on('SIGTERM', async () => {
 // Run tests
 runTests().catch((error) => {
   console.log(chalk.red('❌ Test suite failed:'));
-  console.log(chalk.red(error));
+  console.log(chalk.red(error instanceof Error ? error.message : String(error)));
   process.exit(1);
 });
