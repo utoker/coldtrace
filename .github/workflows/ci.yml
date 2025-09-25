@@ -118,10 +118,10 @@ jobs:
           echo "BACKEND_PID=$BACKEND_PID" >> $GITHUB_ENV
           sleep 15
           echo "✅ Backend should be running on port 4000"
-          echo "🔍 Testing GraphQL endpoint..."
+          echo "🔍 Testing GraphQL endpoint with correct query..."
           curl -X POST http://localhost:4000/graphql \
             -H "Content-Type: application/json" \
-            -d '{"query": "query { devices { id name } }"}' || echo "GraphQL test failed"
+            -d '{"query": "query { getDevices { id name } }"}' || echo "GraphQL test failed"
 
       - name: Test simulator manually
         env:
