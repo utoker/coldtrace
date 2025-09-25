@@ -7,7 +7,7 @@
     "dev:demo": "tsx src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
-    "test": "tsx src/test.ts",
+    "test": "DATABASE_URL=\"$DATABASE_URL\" tsx src/test.ts",
     "test:quick": "timeout 30 tsx src/test.ts",
     "validate": "tsx src/validate.ts",
     "lint": "eslint src --ext .ts",
