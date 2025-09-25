@@ -23,6 +23,12 @@ if (process.env.DATABASE_URL) {
   console.log(chalk.blue("🔍 DATABASE_URL starts with:", process.env.DATABASE_URL.substring(0, 20) + "..."));
 }
 if (!process.env.DATABASE_URL) {
+  console.log(chalk.red("🔍 Available environment variables:"));
+  console.log(chalk.red(Object.keys(process.env).sort().join(", ")));
+  console.log(chalk.red("🔍 Looking for DATABASE_URL in all possible forms..."));
+  const dbVars = Object.keys(process.env).filter(key => key.includes("DATABASE") || key.includes("DB"));
+  console.log(chalk.red("🔍 Database-related vars:", dbVars));
+
   console.log(chalk.red('❌ DATABASE_URL environment variable is not set'));
   console.log(chalk.red('Please ensure you have:'));
   console.log(chalk.red('1. Created a .env file in packages/database/'));

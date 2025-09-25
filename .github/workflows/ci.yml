@@ -63,7 +63,13 @@ jobs:
           fi
 
       - name: Run tests
-        run: pnpm test
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          echo "Setting DATABASE_URL for test process..."
+          export DATABASE_URL="$DATABASE_URL"
+          echo "DATABASE_URL is now: $DATABASE_URL"
+          pnpm test
 
       - name: Run type check
         run: pnpm --filter @coldtrace/logger build && pnpm --filter @coldtrace/database build && pnpm --filter @coldtrace/types build
