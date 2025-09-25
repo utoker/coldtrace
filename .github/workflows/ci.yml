@@ -106,6 +106,18 @@ jobs:
       - name: Build packages
         run: pnpm build
 
+      - name: Debug DATABASE_URL
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          echo "🔍 Debugging DATABASE_URL..."
+          echo "DATABASE_URL exists: $([ -n "$DATABASE_URL" ] && echo "true" || echo "false")"
+          if [ -n "$DATABASE_URL" ]; then
+            echo "DATABASE_URL starts with: ${DATABASE_URL:0:30}..."
+            echo "DATABASE_URL ends with: ...${DATABASE_URL: -20}"
+            echo "DATABASE_URL length: ${#DATABASE_URL}"
+          fi
+
       - name: Start backend in background
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
