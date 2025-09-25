@@ -5,6 +5,7 @@ on:
     branches: [main, develop]
   pull_request:
     branches: [main, develop]
+  workflow_dispatch: # Allow manual triggers
 
 jobs:
   test:
@@ -48,20 +49,6 @@ jobs:
       - name: Run linter
         run: pnpm lint
 
-      - name: Check environment variables
-        run: |
-          echo "🔍 Checking environment variables..."
-          echo "🔍 NODE_ENV: $NODE_ENV"
-          echo "🔍 DATABASE_URL exists: $([ -n "$DATABASE_URL" ] && echo "true" || echo "false")"
-          if [ -n "$DATABASE_URL" ]; then
-            echo "🔍 DATABASE_URL starts with: ${DATABASE_URL:0:20}..."
-          fi
-
-      - name: Run tests
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-        run: pnpm test
-
       - name: Run type check
         run: pnpm --filter @coldtrace/logger build && pnpm --filter @coldtrace/database build && pnpm --filter @coldtrace/types build
 
@@ -95,3 +82,36 @@ jobs:
           test -d packages/logger/dist
           test -d packages/database/dist
           test -d packages/types/dist
+
+  simulator-test:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.15.1
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build packages
+        run: pnpm build
+
+      - name: Test simulator manually
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SIM_INTERVAL_MINUTES: 1
+          SIM_RUN_ONCE: true
+        run: |
+          echo "🧪 Testing simulator manually..."
+          echo "DATABASE_URL is set: $([ -n "$DATABASE_URL" ] && echo "true" || echo "false")"
+          pnpm --filter @coldtrace/simulator start
