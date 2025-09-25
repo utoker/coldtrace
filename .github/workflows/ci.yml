@@ -66,10 +66,8 @@ jobs:
           echo "Setting DATABASE_URL for tsx process..."
           export DATABASE_URL="$DATABASE_URL"
           echo "DATABASE_URL after export: $DATABASE_URL"
-          cd apps/simulator
-          echo "Current directory: $(pwd)"
-          echo "Running tsx with DATABASE_URL: $DATABASE_URL"
-          DATABASE_URL="$DATABASE_URL" tsx src/test.ts
+          echo "Running pnpm test with DATABASE_URL: $DATABASE_URL"
+          DATABASE_URL="$DATABASE_URL" pnpm test
 
       - name: Run type check
         run: pnpm --filter @coldtrace/logger build && pnpm --filter @coldtrace/database build && pnpm --filter @coldtrace/types build
