@@ -106,12 +106,18 @@ jobs:
       - name: Build packages
         run: pnpm build
 
-      - name: Seed database with test data
+      - name: Start backend in background
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          PORT: 4000
+          ALLOWED_ORIGINS: "http://localhost:3000,http://localhost:3001"
         run: |
-          echo "🌱 Seeding database with test data..."
-          pnpm --filter @coldtrace/database db:seed
+          echo "🚀 Starting backend in background..."
+          pnpm --filter @coldtrace/backend start &
+          BACKEND_PID=$!
+          echo "BACKEND_PID=$BACKEND_PID" >> $GITHUB_ENV
+          sleep 10
+          echo "✅ Backend should be running on port 4000"
 
       - name: Test simulator manually
         env:
@@ -121,4 +127,11 @@ jobs:
         run: |
           echo "🧪 Testing simulator manually..."
           echo "DATABASE_URL is set: $([ -n "$DATABASE_URL" ] && echo "true" || echo "false")"
+          echo "Backend should be running on http://localhost:4000"
           pnpm --filter @coldtrace/simulator start
+
+      - name: Stop backend
+        if: always()
+        run: |
+          echo "🛑 Stopping backend..."
+          kill $BACKEND_PID || true
