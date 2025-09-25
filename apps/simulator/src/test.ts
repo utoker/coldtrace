@@ -3,6 +3,13 @@ import { prisma } from '@coldtrace/database';
 import chalk from 'chalk';
 import dotenv from 'dotenv';
 console.log("🚀 Test script starting...");
+console.log("🚀 Environment check:");
+console.log("🚀 All env vars with DATABASE:", Object.keys(process.env).filter(key => key.includes("DATABASE")));
+console.log("🚀 DATABASE_URL from process.env:", process.env.DATABASE_URL ? "EXISTS" : "NOT EXISTS");
+if (process.env.DATABASE_URL) {
+  console.log("🚀 DATABASE_URL length:", process.env.DATABASE_URL.length);
+  console.log("🚀 DATABASE_URL starts with:", process.env.DATABASE_URL.substring(0, 30));
+}
 console.log("🚀 Process env keys:", Object.keys(process.env).filter(key => key.includes("DATABASE")));
 
 // Load environment variables from .env file (if exists)
