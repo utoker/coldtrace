@@ -5,7 +5,6 @@ import { createServer } from 'http';
 import { WebSocketServer } from 'ws';
 import { useServer } from 'graphql-ws/use/ws';
 import { makeExecutableSchema } from '@graphql-tools/schema';
-import { parse } from 'graphql';
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import { getAllowedOrigins } from '@coldtrace/env';
@@ -66,22 +65,19 @@ async function startServer() {
   const serverCleanup = useServer(
     {
       schema,
-      context: async (ctx) => {
+      context: async () => {
         // Create context for WebSocket connections
-        return createContext({
-          req: ctx.extra.request as any,
-          res: {} as any,
-        });
+        return createContext();
       },
-      onConnect: async (ctx) => {
+      onConnect: async () => {
         console.log('🔌 WebSocket client connected');
       },
-      onDisconnect: (ctx, code, reason) => {
+      onDisconnect: (_, code, reason) => {
         console.log(
-          `🔌 WebSocket client disconnected: ${code} ${reason.toString()}`
+          `🔌 WebSocket client disconnected: ${code} ${reason?.toString() || 'unknown'}`
         );
       },
-      onError: (ctx, msg, errors) => {
+      onError: (_, msg, errors) => {
         console.error('🔌 WebSocket error:', msg, errors);
       },
     },
@@ -136,8 +132,8 @@ async function startServer() {
       credentials: true,
     }),
     expressMiddleware(server, {
-      context: async ({ req, res }) => {
-        return createContext({ req, res });
+      context: async () => {
+        return createContext();
       },
     })
   );
