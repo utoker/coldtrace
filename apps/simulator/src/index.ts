@@ -2,7 +2,6 @@ import { ApolloClient, InMemoryCache, gql, HttpLink } from '@apollo/client';
 import fetch from 'cross-fetch';
 import dotenv from 'dotenv';
 import chalk from 'chalk';
-import * as readline from 'readline';
 
 // Load environment variables
 dotenv.config();
@@ -13,8 +12,12 @@ interface Device {
   deviceId: string;
   name: string;
   location: string;
+  latitude?: number;
+  longitude?: number;
   minTemp: number;
   maxTemp: number;
+  battery: number;
+  status: string;
 }
 
 interface Reading {
@@ -35,10 +38,9 @@ interface DeviceState extends Device {
   battery: number;
   isOnline: boolean;
   lastReadingTime: Date;
-  // Demo-specific fields
-  isInExcursion: boolean;
+  // Production fields
+  isMobile: boolean;
   targetTemperature: number;
-  demoMode: string | null;
 }
 
 // Statistics tracking
@@ -56,7 +58,6 @@ class VaccineSimulator {
   private stats: Stats;
   private intervalId?: NodeJS.Timeout;
   private isShuttingDown = false;
-  private rl?: readline.Interface;
 
   // GraphQL Queries and Mutations
   private readonly GET_DEVICES = gql`
@@ -66,8 +67,12 @@ class VaccineSimulator {
         deviceId
         name
         location
+        latitude
+        longitude
         minTemp
         maxTemp
+        battery
+        status
       }
     }
   `;
@@ -112,31 +117,8 @@ class VaccineSimulator {
       },
     });
 
-    // Setup readline for interactive controls
-    try {
-      this.rl = readline.createInterface({
-        input: process.stdin,
-        output: process.stdout,
-      });
-
-      console.log(
-        chalk.green(
-          '✅ Interactive controls initialized - keyboard commands ready'
-        )
-      );
-    } catch (error) {
-      console.error(
-        chalk.red('❌ Failed to setup interactive controls:'),
-        error
-      );
-      // Continue without interactive controls
-    }
-
     // Setup graceful shutdown
     this.setupShutdownHandlers();
-
-    // Setup interactive controls
-    this.setupInteractiveControls();
 
     // Initialize and start
     this.initialize();
@@ -149,10 +131,6 @@ class VaccineSimulator {
 
       console.log(chalk.yellow('\n🛑 Shutting down gracefully...'));
 
-      if (this.rl) {
-        this.rl.close();
-      }
-
       if (this.intervalId) {
         clearInterval(this.intervalId);
       }
@@ -163,58 +141,6 @@ class VaccineSimulator {
 
     process.on('SIGINT', shutdown);
     process.on('SIGTERM', shutdown);
-  }
-
-  private setupInteractiveControls(): void {
-    if (!this.rl) {
-      console.error(chalk.red('❌ Readline interface not initialized'));
-      return;
-    }
-
-    console.log(chalk.blue('🎮 Setting up interactive controls...'));
-
-    this.rl.on('line', (input: string) => {
-      const command = input.trim().toLowerCase();
-
-      switch (command) {
-        case 'e':
-          this.triggerExcursion();
-          break;
-        case 'b':
-          this.simulateLowBattery();
-          break;
-        case 'o':
-          this.takeDeviceOffline();
-          break;
-        case 'r':
-          this.returnToNormal();
-          break;
-        case 's':
-          this.showCurrentStats();
-          break;
-        case 'q':
-          this.gracefulShutdown();
-          break;
-        case 'p':
-          this.simulatePowerOutage();
-          break;
-        case 'a':
-          this.simulateBatchArrival();
-          break;
-        case 'h':
-        case 'help':
-          this.showControls();
-          break;
-        default:
-          if (command !== '') {
-            console.log(chalk.yellow('❓ Unknown command. Type "h" for help.'));
-          }
-      }
-    });
-
-    console.log(
-      chalk.green('✅ Interactive controls ready - try typing "h" for help')
-    );
   }
 
   private async initialize(): Promise<void> {
@@ -229,7 +155,6 @@ class VaccineSimulator {
     );
     console.log(chalk.gray('Temperature Range: 2-8°C (Vaccine Storage)'));
     console.log();
-    this.showControls();
 
     try {
       console.log(chalk.blue('🔄 Initializing simulator...'));
@@ -261,15 +186,15 @@ class VaccineSimulator {
         const devices = result.data.getDevices as Device[];
 
         devices.forEach((device) => {
+          const isMobile = this.isMobileDevice(device);
           this.devices.set(device.id, {
             ...device,
-            battery: 85 + Math.random() * 15, // Start with 85-100% battery
-            isOnline: true,
+            battery: device.battery, // Use actual battery from database
+            isOnline: device.status === 'ONLINE',
             lastReadingTime: new Date(),
-            // Demo-specific fields
-            isInExcursion: false,
+            // Production fields
+            isMobile,
             targetTemperature: 5.0, // Default vaccine storage temperature
-            demoMode: null,
           });
         });
 
@@ -279,9 +204,13 @@ class VaccineSimulator {
 
         // Display loaded devices
         devices.forEach((device) => {
+          const deviceType = this.isMobileDevice(device) ? '🚛' : '🏥';
           console.log(
-            chalk.gray(`  📱 ${device.name} (${device.location}) - `) +
-              chalk.cyan(`${device.minTemp}°C to ${device.maxTemp}°C`)
+            chalk.gray(
+              `  ${deviceType} ${device.name} (${device.location}) - `
+            ) +
+              chalk.cyan(`${device.minTemp}°C to ${device.maxTemp}°C, `) +
+              chalk.yellow(`${device.battery.toFixed(1)}% battery`)
           );
         });
         console.log();
@@ -294,15 +223,41 @@ class VaccineSimulator {
     }
   }
 
-  private generateVaccineTemperature(device: DeviceState): number {
-    // Check if device is in demo mode
-    if (device.isInExcursion) {
-      // Gradually move towards target temperature
-      const currentTemp = device.targetTemperature || 12.0;
-      const variation = (Math.random() - 0.5) * 1.0; // Small variation
-      return Math.round((currentTemp + variation) * 100) / 100;
-    }
+  private isMobileDevice(device: Device): boolean {
+    const mobileKeywords = ['mobile', 'transport', 'vehicle', 'truck', 'unit'];
+    return mobileKeywords.some((keyword) =>
+      device.name.toLowerCase().includes(keyword)
+    );
+  }
 
+  private updateMobileDeviceLocation(device: DeviceState): void {
+    if (!device.latitude || !device.longitude) return;
+
+    // Simulate movement within Tampa Bay area
+    // Tampa Bay bounds: lat 27.8-28.2, lng -82.6 to -82.3
+    const latVariation = (Math.random() - 0.5) * 0.01; // ±0.005 degrees (~0.5km)
+    const lngVariation = (Math.random() - 0.5) * 0.01;
+
+    const newLat = Math.max(
+      27.8,
+      Math.min(28.2, device.latitude + latVariation)
+    );
+    const newLng = Math.max(
+      -82.6,
+      Math.min(-82.3, device.longitude + lngVariation)
+    );
+
+    device.latitude = newLat;
+    device.longitude = newLng;
+
+    console.log(
+      chalk.blue(
+        `🚛 ${device.name} moved to: ${newLat.toFixed(4)}, ${newLng.toFixed(4)}`
+      )
+    );
+  }
+
+  private generateVaccineTemperature(device: DeviceState): number {
     // Check if device is offline
     if (!device.isOnline) {
       // Return last known temperature with slight drift
@@ -316,11 +271,11 @@ class VaccineSimulator {
     // Base temperature for vaccines: 5°C (middle of 2-8°C range)
     const baseTemp = device.targetTemperature || 5.0;
 
-    // Normal variation: ±1.5°C (90% of the time)
+    // Normal variation: ±1.5°C for realistic temperature fluctuations
     const normalVariation = (Math.random() - 0.5) * 3.0;
 
-    // Extremely low chance of excursion in production (100x lower than before)
-    const excursionChance = device.demoMode ? 0.02 : 0.001; // Less random excursions during demo
+    // Very low chance of excursion in production (0.1% chance)
+    const excursionChance = 0.001;
     const randomCheck = Math.random();
     let temperature: number;
 
@@ -417,10 +372,26 @@ class VaccineSimulator {
 
       const promises = Array.from(this.devices.entries()).map(
         async ([_deviceId, device]) => {
-          // Update battery level (decreases by 0.5% per reading, now every 10 minutes) - only for online devices
+          // Update battery level (decreases by 0.5% per reading, now every 2 hours) - only for online devices
           if (device.isOnline) {
-            device.battery = Math.max(0, device.battery - 0.5); // Increased drain rate: 0.5% every 10 minutes (3% per hour)
+            device.battery = Math.max(0, device.battery - 0.5); // 0.5% every 2 hours (6% per day)
+
+            // Auto-recharge when battery drops below 20%
+            if (device.battery < 20) {
+              device.battery = 100;
+              console.log(
+                chalk.green(
+                  `🔋 AUTO-RECHARGE: ${device.name} battery recharged to 100%`
+                )
+              );
+            }
           }
+
+          // Update location for mobile devices
+          if (device.isMobile && device.isOnline) {
+            this.updateMobileDeviceLocation(device);
+          }
+
           device.lastReadingTime = new Date();
 
           // Generate vaccine storage temperature
@@ -505,8 +476,8 @@ class VaccineSimulator {
     // Run immediately once if requested, then exit
     if (runOnce) {
       tick()
-        .then(() => this.gracefulShutdown())
-        .catch((_e) => this.gracefulShutdown());
+        .then(() => this.displayFinalStats())
+        .catch((_e) => this.displayFinalStats());
       return;
     }
 
@@ -538,286 +509,6 @@ class VaccineSimulator {
     console.log(chalk.gray(`⏱️  Runtime: ${runtime}s`));
     console.log(chalk.gray(`🔋 Devices monitored: ${this.devices.size}`));
     console.log(chalk.blue('\n👋 Vaccine monitoring simulation stopped.\n'));
-  }
-
-  // Demo Control Methods
-  private showControls(): void {
-    console.log(chalk.green('📋 Interactive Demo Controls:'));
-    console.log(chalk.gray('═══════════════════════════'));
-    console.log(
-      chalk.yellow('  e + Enter') +
-        chalk.gray(' - Trigger temperature excursion on random device')
-    );
-    console.log(
-      chalk.yellow('  b + Enter') +
-        chalk.gray(' - Simulate low battery on random device')
-    );
-    console.log(
-      chalk.yellow('  o + Enter') + chalk.gray(' - Take random device offline')
-    );
-    console.log(
-      chalk.yellow('  p + Enter') +
-        chalk.gray(' - Simulate power outage (all devices offline)')
-    );
-    console.log(
-      chalk.yellow('  a + Enter') +
-        chalk.gray(' - Simulate batch arrival (bring 3 devices online)')
-    );
-    console.log(
-      chalk.yellow('  r + Enter') + chalk.gray(' - Reset all devices to normal')
-    );
-    console.log(
-      chalk.yellow('  s + Enter') + chalk.gray(' - Show current statistics')
-    );
-    console.log(chalk.yellow('  h + Enter') + chalk.gray(' - Show this help'));
-    console.log(chalk.yellow('  q + Enter') + chalk.gray(' - Quit gracefully'));
-    console.log(chalk.gray('  Ctrl+C   ') + chalk.gray(' - Emergency stop'));
-    console.log();
-  }
-
-  private getRandomOnlineDevice(): DeviceState | null {
-    const onlineDevices = Array.from(this.devices.values()).filter(
-      (d) => d.isOnline
-    );
-    if (onlineDevices.length === 0) return null;
-    return (
-      onlineDevices[Math.floor(Math.random() * onlineDevices.length)] || null
-    );
-  }
-
-  private triggerExcursion(): void {
-    const device = this.getRandomOnlineDevice();
-    if (!device) {
-      console.log(chalk.red('❌ No online devices available for excursion'));
-      return;
-    }
-
-    device.isInExcursion = true;
-    device.targetTemperature = 12.0; // Spike to dangerous temperature
-    device.demoMode = 'excursion';
-
-    console.log(
-      chalk.red(`🌡️  EXCURSION: ${device.name} temperature spiking to 12°C!`)
-    );
-
-    // Reset after 5 minutes
-    setTimeout(() => {
-      if (device.demoMode === 'excursion') {
-        device.isInExcursion = false;
-        device.targetTemperature = 5.0;
-        device.demoMode = null;
-        console.log(
-          chalk.green(
-            `✅ ${device.name} excursion resolved, returning to normal`
-          )
-        );
-      }
-    }, 5 * 60 * 1000);
-  }
-
-  private simulateLowBattery(): void {
-    const device = this.getRandomOnlineDevice();
-    if (!device) {
-      console.log(
-        chalk.red('❌ No online devices available for battery simulation')
-      );
-      return;
-    }
-
-    device.battery = Math.random() * 15 + 5; // Between 5-20%
-    device.demoMode = 'low_battery';
-
-    console.log(
-      chalk.yellow(
-        `🔋 LOW BATTERY: ${device.name} battery at ${device.battery.toFixed(
-          1
-        )}%`
-      )
-    );
-  }
-
-  private takeDeviceOffline(): void {
-    const device = this.getRandomOnlineDevice();
-    if (!device) {
-      console.log(chalk.red('❌ No online devices to take offline'));
-      return;
-    }
-
-    device.isOnline = false;
-    device.demoMode = 'offline';
-
-    console.log(chalk.red(`📴 OFFLINE: ${device.name} has gone offline`));
-  }
-
-  private simulatePowerOutage(): void {
-    const onlineDevices = Array.from(this.devices.values()).filter(
-      (d) => d.isOnline
-    );
-    if (onlineDevices.length === 0) {
-      console.log(
-        chalk.red('❌ No online devices for power outage simulation')
-      );
-      return;
-    }
-
-    // Take all devices offline
-    onlineDevices.forEach((device) => {
-      device.isOnline = false;
-      device.demoMode = 'power_outage';
-    });
-
-    console.log(
-      chalk.red(
-        `⚡ POWER OUTAGE: All ${onlineDevices.length} devices went offline!`
-      )
-    );
-
-    // Bring them back after 30 seconds
-    setTimeout(() => {
-      onlineDevices.forEach((device) => {
-        if (device.demoMode === 'power_outage') {
-          device.isOnline = true;
-          device.demoMode = null;
-        }
-      });
-      console.log(
-        chalk.green(
-          `🔌 POWER RESTORED: ${onlineDevices.length} devices back online`
-        )
-      );
-    }, 30 * 1000);
-  }
-
-  private simulateBatchArrival(): void {
-    const offlineDevices = Array.from(this.devices.values()).filter(
-      (d) => !d.isOnline
-    );
-    if (offlineDevices.length === 0) {
-      console.log(chalk.yellow('💡 No offline devices to bring online'));
-      return;
-    }
-
-    const devicesToActivate = offlineDevices.slice(0, 3);
-    devicesToActivate.forEach((device) => {
-      device.isOnline = true;
-      // Only reset battery if it's critically low (< 20%) to simulate charging
-      if (device.battery < 20) {
-        device.battery = 85 + Math.random() * 15; // Reset to 85-100% range
-      }
-      device.demoMode = null;
-    });
-
-    console.log(
-      chalk.green(
-        `📦 BATCH ARRIVAL: ${devicesToActivate.length} devices came online simultaneously`
-      )
-    );
-    devicesToActivate.forEach((device) => {
-      console.log(
-        chalk.gray(
-          `  📱 ${device.name} - ${device.battery.toFixed(1)}% battery`
-        )
-      );
-    });
-  }
-
-  private returnToNormal(): void {
-    let changesCount = 0;
-
-    Array.from(this.devices.values()).forEach((device) => {
-      if (
-        device.demoMode !== null ||
-        device.isInExcursion ||
-        !device.isOnline
-      ) {
-        device.isOnline = true;
-        device.isInExcursion = false;
-        device.targetTemperature = 5.0;
-        device.demoMode = null;
-
-        // Only reset battery if it's critically low (< 20%) to simulate charging
-        if (device.battery < 20) {
-          device.battery = Math.min(100, 85 + Math.random() * 15); // Reset to 85-100% range
-        }
-        changesCount++;
-      }
-    });
-
-    if (changesCount > 0) {
-      console.log(
-        chalk.green(
-          `🔄 RESET: ${changesCount} devices returned to normal operation`
-        )
-      );
-    } else {
-      console.log(chalk.blue('ℹ️  All devices are already in normal state'));
-    }
-  }
-
-  private showCurrentStats(): void {
-    const runtime = Math.round(
-      (Date.now() - this.stats.startTime.getTime()) / 1000
-    );
-    const successRate =
-      this.stats.totalReadings > 0
-        ? Math.round(
-            (this.stats.successfulReadings / this.stats.totalReadings) * 100
-          )
-        : 0;
-
-    console.log(chalk.blue('\n📊 Current Statistics:'));
-    console.log(chalk.gray('════════════════════'));
-    console.log(
-      chalk.green(`✅ Successful readings: ${this.stats.successfulReadings}`)
-    );
-    console.log(chalk.red(`❌ Failed readings: ${this.stats.failedReadings}`));
-    console.log(
-      chalk.yellow(`⚠️  Alerts created: ${this.stats.alertsCreated}`)
-    );
-    console.log(chalk.blue(`📈 Success rate: ${successRate}%`));
-    console.log(chalk.gray(`⏱️  Runtime: ${runtime}s`));
-
-    // Device status overview
-    const onlineDevices = Array.from(this.devices.values()).filter(
-      (d) => d.isOnline
-    );
-    const offlineDevices = Array.from(this.devices.values()).filter(
-      (d) => !d.isOnline
-    );
-    const excursionDevices = Array.from(this.devices.values()).filter(
-      (d) => d.isInExcursion
-    );
-    const lowBatteryDevices = Array.from(this.devices.values()).filter(
-      (d) => d.battery < 20
-    );
-
-    console.log(chalk.gray('\n🏥 Device Status Overview:'));
-    console.log(chalk.green(`  📱 Online devices: ${onlineDevices.length}`));
-    console.log(chalk.red(`  📴 Offline devices: ${offlineDevices.length}`));
-    console.log(
-      chalk.yellow(`  🌡️  Temperature excursions: ${excursionDevices.length}`)
-    );
-    console.log(
-      chalk.hex('#FFA500')(
-        `  🔋 Low battery devices: ${lowBatteryDevices.length}`
-      )
-    );
-    console.log();
-  }
-
-  private gracefulShutdown(): void {
-    console.log(chalk.yellow('🛑 Shutting down gracefully...'));
-
-    if (this.rl) {
-      this.rl.close();
-    }
-
-    if (this.intervalId) {
-      clearInterval(this.intervalId);
-    }
-
-    this.displayFinalStats();
-    process.exit(0);
   }
 }
 
