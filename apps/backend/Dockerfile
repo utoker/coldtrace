@@ -9,13 +9,15 @@ WORKDIR /app
 
 # Copy package files for dependency resolution
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+
+# Copy all workspace packages (not just package.json files)
+COPY packages/ ./packages/
 COPY apps/backend/package.json ./apps/backend/
-COPY packages/*/package.json ./packages/*/
 
 # Install dependencies (use --no-frozen-lockfile for Railway)
 RUN pnpm install --no-frozen-lockfile
 
-# Copy source code
+# Copy remaining source code
 COPY . .
 
 # Build the project
