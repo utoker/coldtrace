@@ -142,4 +142,30 @@
   .custom-scrollbar::-webkit-scrollbar-thumb:hover {
     background: #9ca3af;
   }
+
+  /* Prevent map from covering header */
+  .leaflet-container {
+    z-index: 0 !important;
+    position: relative !important;
+    overflow: hidden !important;
+  }
+
+  /* Force all Leaflet elements to stay below header */
+  .leaflet-container,
+  .leaflet-map-pane,
+  .leaflet-tile-pane,
+  .leaflet-overlay-pane,
+  .leaflet-shadow-pane,
+  .leaflet-marker-pane,
+  .leaflet-tooltip-pane,
+  .leaflet-popup-pane,
+  .leaflet-control-container {
+    z-index: 0 !important;
+    position: relative !important;
+  }
+
+  /* Only popups should be above */
+  .leaflet-popup {
+    z-index: 10 !important;
+  }
 }

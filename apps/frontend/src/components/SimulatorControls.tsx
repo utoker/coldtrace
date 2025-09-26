@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useMutation } from '@apollo/client/react';
 import { gql } from '@apollo/client';
+import { useDeviceStore } from '@/store/useDeviceStore';
 import {
   Activity,
   Battery,
@@ -109,6 +110,16 @@ export function SimulatorControls() {
   const [selectedDeviceId, setSelectedDeviceId] = useState('');
   const [lastResult, setLastResult] = useState<SimulationResult | null>(null);
 
+  // Get selected device from store
+  const selectedDevice = useDeviceStore((state) => state.selectedDevice);
+
+  // Update input field when store selection changes
+  useEffect(() => {
+    if (selectedDevice) {
+      setSelectedDeviceId(selectedDevice.deviceId);
+    }
+  }, [selectedDevice]);
+
   // GraphQL hooks
   const [triggerExcursion, { loading: excursionLoading }] =
     useMutation(TRIGGER_EXCURSION);
@@ -195,6 +206,12 @@ export function SimulatorControls() {
               placeholder="Enter device ID or leave empty for random"
               className="w-full px-3 py-2 border border-input rounded-md text-sm bg-background"
             />
+            {selectedDevice && (
+              <p className="text-xs text-gray-500">
+                Selected from map: {selectedDevice.name} (
+                {selectedDevice.location})
+              </p>
+            )}
           </div>
 
           {/* Control Buttons */}

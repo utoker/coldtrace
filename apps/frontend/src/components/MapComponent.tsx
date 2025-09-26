@@ -23,10 +23,15 @@ interface Device {
 interface MapComponentProps {
   devices: Device[];
   onDeviceClick: (device: Device) => void;
+  onViewDetails: (device: Device) => void;
 }
 
 const MapComponent = memo(
-  function MapComponent({ devices, onDeviceClick }: MapComponentProps) {
+  function MapComponent({
+    devices,
+    onDeviceClick,
+    onViewDetails,
+  }: MapComponentProps) {
     const mapRef = useRef<HTMLDivElement>(null);
     const leafletMapRef = useRef<any>(null);
     const markersRef = useRef<Map<string, any>>(new Map());
@@ -86,10 +91,44 @@ const MapComponent = memo(
                 .leaflet-tooltip-pane,
                 .leaflet-popup-pane,
                 .leaflet-control-container {
-                  z-index: 1 !important;
+                  z-index: 0 !important;
+                  position: relative !important;
                 }
                 .leaflet-popup {
-                  z-index: 2 !important;
+                  z-index: 10 !important;
+                }
+                .leaflet-container {
+                  overflow: hidden !important;
+                  position: relative !important;
+                  z-index: 0 !important;
+                }
+                .leaflet-map-pane {
+                  position: relative !important;
+                  z-index: 0 !important;
+                }
+                .leaflet-tile-pane {
+                  position: relative !important;
+                  z-index: 0 !important;
+                }
+                .leaflet-overlay-pane {
+                  position: relative !important;
+                  z-index: 0 !important;
+                }
+                .leaflet-marker-pane {
+                  position: relative !important;
+                  z-index: 0 !important;
+                }
+                .leaflet-tooltip-pane {
+                  position: relative !important;
+                  z-index: 0 !important;
+                }
+                .leaflet-popup-pane {
+                  position: relative !important;
+                  z-index: 0 !important;
+                }
+                .leaflet-control-container {
+                  position: relative !important;
+                  z-index: 0 !important;
                 }
                 .device-marker {
                   width: 20px;
@@ -169,6 +208,79 @@ const MapComponent = memo(
             maxZoom: 19,
           }).addTo(map);
 
+          // Prevent map from expanding on click and lock container styles
+          map.on('click', (e) => {
+            e.originalEvent.stopPropagation();
+          });
+
+          // Disable Leaflet's automatic resize detection
+          map.options.trackResize = false;
+          map.options.boxZoom = false;
+
+          // Lock the map container to prevent Leaflet from modifying it
+          const mapContainer = map.getContainer();
+          if (mapContainer) {
+            mapContainer.style.position = 'relative';
+            mapContainer.style.zIndex = '0';
+            mapContainer.style.overflow = 'hidden';
+            mapContainer.style.height = '100%';
+            mapContainer.style.width = '100%';
+            mapContainer.style.maxHeight = '100%';
+            mapContainer.style.minHeight = '0';
+          }
+
+          // Prevent Leaflet from modifying container styles
+          const originalSetStyle = mapContainer.style.setProperty;
+          mapContainer.style.setProperty = function (
+            property,
+            value,
+            priority
+          ) {
+            if (property === 'z-index' || property === 'position') {
+              return; // Block Leaflet from changing these
+            }
+            return originalSetStyle.call(this, property, value, priority);
+          };
+
+          // Watch for any DOM changes and revert z-index/position changes
+          const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+              if (
+                mutation.type === 'attributes' &&
+                mutation.attributeName === 'style'
+              ) {
+                const target = mutation.target as HTMLElement;
+                if (
+                  target.classList.contains('leaflet-container') ||
+                  target.classList.contains('leaflet-map-pane') ||
+                  target.classList.contains('leaflet-tile-pane') ||
+                  target.classList.contains('leaflet-overlay-pane') ||
+                  target.classList.contains('leaflet-marker-pane')
+                ) {
+                  target.style.zIndex = '0';
+                  target.style.position = 'relative';
+                }
+              }
+            });
+          });
+
+          observer.observe(mapContainer, {
+            attributes: true,
+            attributeFilter: ['style'],
+          });
+
+          // Periodic check to ensure map stays at correct size
+          const sizeCheckInterval = setInterval(() => {
+            if (mapContainer.style.height !== '100%') {
+              mapContainer.style.height = '100%';
+              mapContainer.style.maxHeight = '100%';
+              mapContainer.style.minHeight = '0';
+            }
+          }, 100);
+
+          // Store interval for cleanup
+          (map as any)._sizeCheckInterval = sizeCheckInterval;
+
           leafletMapRef.current = map;
           setIsMapReady(true);
         } catch (error) {
@@ -186,6 +298,10 @@ const MapComponent = memo(
       // Cleanup
       return () => {
         if (leafletMapRef.current) {
+          // Clear the size check interval
+          if ((leafletMapRef.current as any)._sizeCheckInterval) {
+            clearInterval((leafletMapRef.current as any)._sizeCheckInterval);
+          }
           leafletMapRef.current.remove();
           leafletMapRef.current = null;
           markersRef.current.clear();
@@ -251,6 +367,11 @@ const MapComponent = memo(
                 icon: createIcon(device),
               });
 
+              // Add click event to marker itself
+              marker.on('click', () => {
+                onDeviceClick(device);
+              });
+
               // Create popup content with cleaner structure
               const createPopupContent = (device: Device): string => {
                 const getStatusColor = (status: string) => {
@@ -310,7 +431,7 @@ const MapComponent = memo(
                       </div>
                     </div>
                     <button 
-                      onclick="window.handleDeviceClick('${device.id}')"
+                      onclick="window.handleViewDetails('${device.id}')"
                       class="popup-button"
                     >
                       View Details
@@ -352,20 +473,20 @@ const MapComponent = memo(
     // Set up global click handler for popup buttons
     useEffect(() => {
       if (typeof window !== 'undefined') {
-        (window as any).handleDeviceClick = (deviceId: string) => {
+        (window as any).handleViewDetails = (deviceId: string) => {
           const device = devices.find((d) => d.id === deviceId);
           if (device) {
-            onDeviceClick(device);
+            onViewDetails(device);
           }
         };
       }
 
       return () => {
         if (typeof window !== 'undefined') {
-          delete (window as any).handleDeviceClick;
+          delete (window as any).handleViewDetails;
         }
       };
-    }, [devices, onDeviceClick]);
+    }, [devices, onViewDetails]);
 
     if (mapError) {
       return (
@@ -406,12 +527,27 @@ const MapComponent = memo(
 
     return (
       <div
-        className="rounded-lg border overflow-hidden relative"
-        style={{ height: '600px' }}
+        className="rounded-lg border overflow-hidden relative h-full"
+        style={{
+          height: '100%',
+          width: '100%',
+          position: 'relative',
+          zIndex: 0,
+          maxHeight: '100%',
+          minHeight: '0',
+        }}
       >
         <div
           ref={mapRef}
-          style={{ height: '100%', width: '100%', zIndex: 1 }}
+          style={{
+            height: '100%',
+            width: '100%',
+            position: 'relative',
+            zIndex: 0,
+            maxHeight: '100%',
+            minHeight: '0',
+            overflow: 'hidden',
+          }}
           className="leaflet-container"
         />
         {!isMapReady && (

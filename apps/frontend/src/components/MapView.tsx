@@ -7,6 +7,7 @@ import dynamic from 'next/dynamic';
 import { DeviceDetailModal } from './DeviceDetailModal';
 import { MapPin, Loader2 } from 'lucide-react';
 import { Card, CardContent } from './ui/card';
+import { useDeviceStore } from '@/store/useDeviceStore';
 
 // Dynamically import the entire map component to avoid SSR issues
 const DynamicMap = dynamic(() => import('./MapComponent'), {
@@ -124,9 +125,12 @@ const DEVICE_STATUS_CHANGED = gql`
 
 export function MapView() {
   const [devices, setDevices] = useState<Device[]>([]);
-  const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
+
+  // Use store for selected device instead of local state
+  const selectedDevice = useDeviceStore((state) => state.selectedDevice);
+  const selectDevice = useDeviceStore((state) => state.selectDevice);
 
   // Fetch devices
   const { data, loading, error } = useQuery<GetDevicesData>(GET_DEVICES, {
@@ -272,15 +276,25 @@ export function MapView() {
     setIsMounted(true);
   }, []);
 
-  const handleDeviceClick = useCallback((device: Device) => {
-    setSelectedDevice(device);
-    setIsModalOpen(true);
-  }, []);
+  const handleDeviceClick = useCallback(
+    (device: Device) => {
+      selectDevice(device); // Update global store only
+    },
+    [selectDevice]
+  );
+
+  const handleViewDetails = useCallback(
+    (device: Device) => {
+      selectDevice(device); // Update global store
+      setIsModalOpen(true); // Open modal
+    },
+    [selectDevice]
+  );
 
   const handleModalClose = useCallback(() => {
     setIsModalOpen(false);
-    setSelectedDevice(null);
-  }, []);
+    selectDevice(null); // Clear global selection
+  }, [selectDevice]);
 
   // Memoize filtered devices to prevent unnecessary re-renders
   const devicesWithLocation = useMemo(() => {
@@ -318,7 +332,7 @@ export function MapView() {
   }
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col overflow-hidden">
       <div className="px-8 py-6 flex-shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
@@ -353,10 +367,11 @@ export function MapView() {
         </div>
       </div>
 
-      <div className="flex-1 p-0">
+      <div className="flex-1 p-0 overflow-hidden relative">
         <DynamicMap
           devices={devicesWithLocation}
           onDeviceClick={handleDeviceClick}
+          onViewDetails={handleViewDetails}
         />
       </div>
 
