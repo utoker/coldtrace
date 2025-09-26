@@ -22,6 +22,8 @@ const SERVER_CONFIG = {
     'http://127.0.0.1:3000',
     'http://127.0.0.1:3001',
     'https://coldtrace-frontend.vercel.app',
+    'https://coldtrace.app',
+    'https://www.coldtrace.app',
   ]),
 } as const;
 
@@ -48,56 +50,39 @@ async function startServer() {
         ? ALLOWED_ORIGINS.includes(origin)
         : process.env.NODE_ENV !== 'production';
       if (!isAllowed) {
-        console.log(`❌ WebSocket connection rejected from origin: ${origin}`);
+        console.log(
+          `🔌 WebSocket connection rejected from origin: ${origin || 'unknown'}`
+        );
+        return false;
       }
-      return isAllowed;
+      console.log(
+        `🔌 WebSocket connection accepted from origin: ${origin || 'unknown'}`
+      );
+      return true;
     },
   });
 
-  // Set up GraphQL WebSocket server using useServer
+  // Create GraphQL WebSocket server
   const serverCleanup = useServer(
     {
       schema,
-      context: async (_ctx: any) => await createContext(),
-      onConnect: async (_ctx: any) => {
-        console.log('🔌 GraphQL-WS Client connected');
-        return true; // Allow all connections
+      context: async (ctx) => {
+        // Create context for WebSocket connections
+        return createContext({
+          req: ctx.extra.request as any,
+          res: {} as any,
+        });
       },
-      onDisconnect: (_ctx: any, code?: number, reason?: string) => {
-        if (code && code !== 1000) {
-          // Only log abnormal disconnections
-          console.log(`🔌 GraphQL-WS Client disconnected (${code}: ${reason})`);
-        }
+      onConnect: async (ctx) => {
+        console.log('🔌 WebSocket client connected');
       },
-      onSubscribe: async (_ctx: any, _id: string, payload: any) => {
-        // Parse the query string to GraphQL document
-        let document;
-        try {
-          document = parse(payload.query);
-        } catch (error) {
-          console.error('❌ Error parsing GraphQL query:', error);
-          throw error;
-        }
-
-        // Return the standard GraphQL execution args
-        return {
-          schema,
-          operationName: payload.operationName || undefined,
-          document,
-          variableValues: payload.variables || {},
-          contextValue: await createContext(),
-        };
-      },
-      onError: (
-        _ctx: any,
-        _id: string,
-        _payload: any,
-        errors: readonly Error[]
-      ) => {
-        console.error(
-          '❌ GraphQL WebSocket subscription error:',
-          errors.map((e) => e.message)
+      onDisconnect: (ctx, code, reason) => {
+        console.log(
+          `🔌 WebSocket client disconnected: ${code} ${reason.toString()}`
         );
+      },
+      onError: (ctx, msg, errors) => {
+        console.error('🔌 WebSocket error:', msg, errors);
       },
     },
     wsServer
@@ -107,6 +92,9 @@ async function startServer() {
   const server = new ApolloServer<GraphQLContext>({
     schema,
     introspection: process.env.NODE_ENV !== 'production',
+    csrfPrevention: {
+      requestHeaders: ['content-type', 'x-apollo-operation-name', 'apollo-require-preflight'],
+    },
     plugins: [
       ApolloServerPluginDrainHttpServer({ httpServer }),
       {
@@ -147,50 +135,43 @@ async function startServer() {
       },
       credentials: true,
     }),
-    express.json(),
     expressMiddleware(server, {
-      context: createContext,
+      context: async ({ req, res }) => {
+        return createContext({ req, res });
+      },
     })
   );
 
-  // Health check
-  app.get('/health', (_req, res) => {
-    res.json({
-      status: 'ok',
-      timestamp: new Date().toISOString(),
-      websocket: 'enabled',
-    });
+  // Health check endpoint
+  app.get('/health', (_req: Request, res: Response) => {
+    res.json({ status: 'ok', timestamp: new Date().toISOString() });
   });
 
-  // Start server on single port
+  // Start server
   httpServer.listen(PORT, () => {
-    console.log(
-      `🚀 GraphQL HTTP Server ready at: http://localhost:${PORT}/graphql`
-    );
-    console.log(
-      `🔌 GraphQL WebSocket Server ready at: ws://localhost:${PORT}/graphql`
-    );
-    console.log(
-      `🏥 Health check available at: http://localhost:${PORT}/health`
-    );
-    console.log(`🔍 GraphQL Playground available in development mode`);
+    console.log(`🚀 GraphQL HTTP Server ready at: http://localhost:${PORT}/graphql`);
+    console.log(`🔌 GraphQL WebSocket Server ready at: ws://localhost:${PORT}/graphql`);
+    console.log(`🏥 Health check available at: http://localhost:${PORT}/health`);
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`🔍 GraphQL Playground available in development mode`);
+    }
     console.log(`📊 Enhanced WebSocket logging enabled`);
   });
-
-  // Graceful shutdown
-  const shutdown = async () => {
-    console.log('🛑 Shutting down servers...');
-    await serverCleanup.dispose();
-    httpServer.close();
-    await server.stop();
-    process.exit(0);
-  };
-
-  process.on('SIGTERM', shutdown);
-  process.on('SIGINT', shutdown);
 }
 
+// Handle graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('🛑 SIGTERM received, shutting down gracefully');
+  process.exit(0);
+});
+
+process.on('SIGINT', () => {
+  console.log('🛑 SIGINT received, shutting down gracefully');
+  process.exit(0);
+});
+
+// Start the server
 startServer().catch((error) => {
-  console.error('❌ Error starting server:', error);
+  console.error('❌ Failed to start server:', error);
   process.exit(1);
 });
