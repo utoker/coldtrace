@@ -22,6 +22,9 @@ RUN pnpm install --no-frozen-lockfile
 # Copy source code
 COPY . .
 
+# Clean any existing build artifacts to ensure fresh build
+RUN rm -rf packages/*/dist apps/backend/dist
+
 # Build workspace dependencies in correct order (based on dependency graph)
 RUN pnpm --filter @coldtrace/env build
 RUN pnpm --filter @coldtrace/logger build
