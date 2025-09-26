@@ -12,8 +12,8 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/backend/package.json ./apps/backend/
 COPY packages/*/package.json ./packages/*/
 
-# Install dependencies
-RUN pnpm install --frozen-lockfile
+# Install dependencies (use --no-frozen-lockfile for Railway)
+RUN pnpm install --no-frozen-lockfile
 
 # Copy source code
 COPY . .
