@@ -22,14 +22,14 @@ RUN pnpm install --no-frozen-lockfile
 # Copy source code
 COPY . .
 
-# Build workspace dependencies first
-RUN pnpm --filter @coldtrace/database build
+# Build workspace dependencies first (in correct order)
 RUN pnpm --filter @coldtrace/env build
 RUN pnpm --filter @coldtrace/logger build
 RUN pnpm --filter @coldtrace/types build
+RUN pnpm --filter @coldtrace/database build
 
-# Build backend
-RUN pnpm --filter @coldtrace/backend build
+# Build backend using pnpm (not npm)
+RUN cd apps/backend && pnpm run generate && pnpm run build
 
 # Expose port
 EXPOSE 4000
