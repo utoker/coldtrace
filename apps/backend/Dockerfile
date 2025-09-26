@@ -20,8 +20,8 @@ RUN pnpm install --no-frozen-lockfile
 # Copy remaining source code
 COPY . .
 
-# Build the project
-RUN pnpm build
+# Build only the backend and its dependencies
+RUN pnpm --filter @coldtrace/backend build
 
 # Expose port
 EXPOSE 4000
