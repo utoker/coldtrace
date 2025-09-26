@@ -28,9 +28,16 @@ const SERVER_CONFIG = {
 
 async function startServer() {
   const { PORT, ALLOWED_ORIGINS } = SERVER_CONFIG;
+  
+  // Debug: Log allowed origins
+  console.log('🔧 Allowed origins:', ALLOWED_ORIGINS);
 
   // Create Express app
   const app = express();
+
+  // Add JSON parsing middleware (required for GraphQL requests)
+  app.use(express.json({ limit: '10mb' }));
+  app.use(express.urlencoded({ extended: true }));
 
   // Create HTTP server (will handle both HTTP and WebSocket)
   const httpServer = createServer(app);
@@ -48,6 +55,10 @@ async function startServer() {
       const isAllowed = origin
         ? ALLOWED_ORIGINS.includes(origin)
         : process.env.NODE_ENV !== 'production';
+      
+      // Enhanced debugging for origin validation
+      console.log(`🔌 WebSocket origin check: "${origin}" in [${ALLOWED_ORIGINS.join(', ')}] = ${isAllowed}`);
+      
       if (!isAllowed) {
         console.log(
           `🔌 WebSocket connection rejected from origin: ${origin || 'unknown'}`
@@ -74,7 +85,9 @@ async function startServer() {
       },
       onDisconnect: (_, code, reason) => {
         console.log(
-          `🔌 WebSocket client disconnected: ${code} ${reason?.toString() || 'unknown'}`
+          `🔌 WebSocket client disconnected: ${code} ${
+            reason?.toString() || 'unknown'
+          }`
         );
       },
       onError: (_, msg, errors) => {
@@ -89,7 +102,11 @@ async function startServer() {
     schema,
     introspection: process.env.NODE_ENV !== 'production',
     csrfPrevention: {
-      requestHeaders: ['content-type', 'x-apollo-operation-name', 'apollo-require-preflight'],
+      requestHeaders: [
+        'content-type',
+        'x-apollo-operation-name',
+        'apollo-require-preflight',
+      ],
     },
     plugins: [
       ApolloServerPluginDrainHttpServer({ httpServer }),
@@ -124,8 +141,19 @@ async function startServer() {
     cors({
       origin: (origin, callback) => {
         // Allow requests without Origin (SSR, server-to-server, health checks)
-        if (!origin) return callback(null, true);
-        if (ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
+        if (!origin) {
+          console.log('🌐 CORS: Allowing request without origin');
+          return callback(null, true);
+        }
+        
+        const isAllowed = ALLOWED_ORIGINS.includes(origin);
+        console.log(`🌐 CORS origin check: "${origin}" in [${ALLOWED_ORIGINS.join(', ')}] = ${isAllowed}`);
+        
+        if (isAllowed) {
+          return callback(null, true);
+        }
+        
+        console.log(`🌐 CORS: Rejecting origin: ${origin}`);
         // Deny with no error to avoid opaque network failures in browsers
         return callback(null, false);
       },
@@ -145,9 +173,15 @@ async function startServer() {
 
   // Start server
   httpServer.listen(PORT, () => {
-    console.log(`🚀 GraphQL HTTP Server ready at: http://localhost:${PORT}/graphql`);
-    console.log(`🔌 GraphQL WebSocket Server ready at: ws://localhost:${PORT}/graphql`);
-    console.log(`🏥 Health check available at: http://localhost:${PORT}/health`);
+    console.log(
+      `🚀 GraphQL HTTP Server ready at: http://localhost:${PORT}/graphql`
+    );
+    console.log(
+      `🔌 GraphQL WebSocket Server ready at: ws://localhost:${PORT}/graphql`
+    );
+    console.log(
+      `🏥 Health check available at: http://localhost:${PORT}/health`
+    );
     if (process.env.NODE_ENV !== 'production') {
       console.log(`🔍 GraphQL Playground available in development mode`);
     }
