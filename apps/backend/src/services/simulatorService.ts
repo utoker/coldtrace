@@ -81,7 +81,7 @@ class SimulatorService {
       });
 
       // Create a normal reading to reflect the recharge event
-      const { resolvers } = await import('../graphql/resolvers');
+      const { resolvers } = await import('../graphql/resolvers.js');
       await resolvers.Mutation.createReading(
         null,
         {
@@ -176,7 +176,7 @@ class SimulatorService {
       });
 
       // Use the createReading resolver to ensure proper data handling
-      const { resolvers } = await import('../graphql/resolvers');
+      const { resolvers } = await import('../graphql/resolvers.js');
       await resolvers.Mutation.createReading(
         null,
         {
@@ -248,7 +248,7 @@ class SimulatorService {
       });
 
       // Use the createReading resolver to ensure proper data handling
-      const { resolvers } = await import('../graphql/resolvers');
+      const { resolvers } = await import('../graphql/resolvers.js');
       await resolvers.Mutation.createReading(
         null,
         {
@@ -475,7 +475,7 @@ class SimulatorService {
 
       // Create readings for the newly online devices using the createReading resolver
       // This ensures proper data handling and WebSocket events are published
-      const { resolvers } = await import('../graphql/resolvers');
+      const { resolvers } = await import('../graphql/resolvers.js');
       const readingPromises = updatedDevicesForReadings.map((device) =>
         resolvers.Mutation.createReading(
           null,
@@ -565,7 +565,7 @@ class SimulatorService {
 
       // Create normal readings for all reset devices using the createReading resolver
       // This ensures proper data handling and WebSocket events are published
-      const { resolvers } = await import('../graphql/resolvers');
+      const { resolvers } = await import('../graphql/resolvers.js');
       const readingPromises = updatedDevicesForReadings.map((device) =>
         resolvers.Mutation.createReading(
           null,
