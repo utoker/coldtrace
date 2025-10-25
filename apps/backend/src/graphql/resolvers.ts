@@ -110,7 +110,7 @@ export const resolvers = {
       try {
         const where: Record<string, unknown> = {};
 
-        if (status) where.deviceType = status; // Note: Database still uses deviceType field
+        if (status) where.status = status;
         if (typeof isActive === 'boolean') where.isActive = isActive;
         if (location)
           where.location = { contains: location, mode: 'insensitive' };
