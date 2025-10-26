@@ -402,47 +402,6 @@ export function DeviceGrid() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      {/* Stats Summary */}
-      <div className="mb-6 text-center">
-        <p className="text-sm text-gray-600">
-          Monitoring{' '}
-          <span className="font-semibold text-slate-900">{devices.length}</span>{' '}
-          devices
-          {devices.filter((d) => d.status === 'ONLINE').length > 0 && (
-            <>
-              {' • '}
-              <span className="font-semibold text-green-600">
-                {devices.filter((d) => d.status === 'ONLINE').length} online
-              </span>
-            </>
-          )}
-          {updatingDevices.size > 0 && (
-            <>
-              {' • '}
-              <span className="font-semibold text-blue-600 animate-pulse">
-                Live updates active
-              </span>
-            </>
-          )}
-        </p>
-        <p className="text-xs text-gray-500 mt-1">
-          Last updated: {lastUpdate.toLocaleTimeString()}
-          {' • '}
-          <span
-            className={`font-medium ${
-              wsConnected ? 'text-green-600' : 'text-orange-600'
-            }`}
-          >
-            {wsConnected ? '🔗 Real-time' : '📡 Polling'}
-          </span>
-          {subscriptionErrors > 0 && (
-            <span className="text-red-500 ml-1">
-              (⚠️ {subscriptionErrors} errors)
-            </span>
-          )}
-        </p>
-      </div>
-
       {/* Device Grid/List */}
       {view === 'grid' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">

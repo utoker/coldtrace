@@ -527,26 +527,87 @@ class SimulatorService {
     }
   }
 
-  async returnToNormal(): Promise<SimulatorResult> {
+  async returnToNormal(deviceId?: string): Promise<SimulatorResult> {
     try {
-      // Get all devices that need to be reset
-      const devicesToReset = await prisma.device.findMany({
-        where: {
-          OR: [
-            { status: 'OFFLINE' },
-            { status: 'MAINTENANCE' },
-            { battery: { lt: 20 } }, // Also reset devices with low battery
-          ],
-          isActive: true,
-        },
-      });
+      let devicesToReset;
 
-      if (devicesToReset.length === 0) {
-        return {
-          success: true,
-          message: 'All devices are already in normal state',
-          affectedDevices: [],
-        };
+      if (deviceId) {
+        // Reset specific device
+        const device = await this.findDeviceByAnyId(deviceId);
+
+        if (!device) {
+          return {
+            success: false,
+            message: `Device with ID ${deviceId} not found`,
+            affectedDevices: [],
+          };
+        }
+
+        // Get device with its latest reading to check temperature status
+        const deviceWithReading = await prisma.device.findUnique({
+          where: { id: device.id },
+          include: {
+            readings: {
+              take: 1,
+              orderBy: { timestamp: 'desc' },
+            },
+          },
+        });
+
+        // Check if device needs resetting (offline, maintenance, low battery, or abnormal temperature)
+        const needsReset =
+          deviceWithReading!.status === 'OFFLINE' ||
+          deviceWithReading!.status === 'MAINTENANCE' ||
+          deviceWithReading!.battery < 20 ||
+          !deviceWithReading!.readings[0] || // No readings yet
+          deviceWithReading!.readings[0].status === 'CRITICAL' ||
+          deviceWithReading!.readings[0].status === 'WARNING' ||
+          deviceWithReading!.readings[0].temperature < 2 ||
+          deviceWithReading!.readings[0].temperature > 8;
+
+        if (!needsReset) {
+          return {
+            success: true,
+            message: `Device ${device.name} is already in normal state`,
+            affectedDevices: [],
+          };
+        }
+
+        devicesToReset = [deviceWithReading!];
+      } else {
+        // Get all devices with their latest readings
+        const allDevices = await prisma.device.findMany({
+          where: { isActive: true },
+          include: {
+            readings: {
+              take: 1,
+              orderBy: { timestamp: 'desc' },
+            },
+          },
+        });
+
+        // Filter devices that need resetting
+        devicesToReset = allDevices.filter((device) => {
+          const latestReading = device.readings[0];
+          return (
+            device.status === 'OFFLINE' ||
+            device.status === 'MAINTENANCE' ||
+            device.battery < 20 ||
+            !latestReading || // No readings yet
+            latestReading.status === 'CRITICAL' ||
+            latestReading.status === 'WARNING' ||
+            latestReading.temperature < 2 ||
+            latestReading.temperature > 8
+          );
+        });
+
+        if (devicesToReset.length === 0) {
+          return {
+            success: true,
+            message: 'All devices are already in normal state',
+            affectedDevices: [],
+          };
+        }
       }
 
       // Reset all devices to normal with good battery levels
@@ -604,7 +665,9 @@ class SimulatorService {
 
       return {
         success: true,
-        message: `${devicesToReset.length} devices returned to normal operation`,
+        message: deviceId
+          ? `${devicesToReset[0].name} returned to normal operation`
+          : `${devicesToReset.length} devices returned to normal operation`,
         affectedDevices: updatedDevices,
       };
     } catch (error) {

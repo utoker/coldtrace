@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { useQuery, useSubscription } from '@apollo/client/react';
+import { useQuery } from '@apollo/client/react';
 import { gql } from '@apollo/client';
 import dynamic from 'next/dynamic';
 import { DeviceDetailModal } from './DeviceDetailModal';
@@ -46,24 +46,6 @@ interface GetDevicesData {
   getDevices: Device[];
 }
 
-interface TemperatureUpdateData {
-  temperatureUpdates: {
-    id: string;
-    deviceId: string;
-    temperature: number;
-    status: 'NORMAL' | 'WARNING' | 'CRITICAL';
-    timestamp: string;
-    device: {
-      id: string;
-      name: string;
-    };
-  };
-}
-
-interface DeviceStatusChangedData {
-  deviceStatusChanged: Device;
-}
-
 // GraphQL Queries - Updated to include latitude/longitude
 const GET_DEVICES = gql`
   query GetDevices($limit: Int) {
@@ -86,190 +68,31 @@ const GET_DEVICES = gql`
   }
 `;
 
-const TEMPERATURE_UPDATES = gql`
-  subscription TemperatureUpdates {
-    temperatureUpdates {
-      id
-      deviceId
-      temperature
-      status
-      timestamp
-      device {
-        id
-        name
-      }
-    }
-  }
-`;
-
-const DEVICE_STATUS_CHANGED = gql`
-  subscription DeviceStatusChanged {
-    deviceStatusChanged {
-      id
-      deviceId
-      name
-      location
-      latitude
-      longitude
-      battery
-      status
-      isActive
-      latestReading {
-        temperature
-        status
-        timestamp
-      }
-    }
-  }
-`;
-
 export function MapView() {
-  const [devices, setDevices] = useState<Device[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
 
-  // Use store for selected device instead of local state
+  // Use Zustand store for devices and selected device
+  const devices = useDeviceStore((state) => state.devices);
   const selectedDevice = useDeviceStore((state) => state.selectedDevice);
   const selectDevice = useDeviceStore((state) => state.selectDevice);
+  const setDevices = useDeviceStore((state) => state.setDevices);
 
-  // Fetch devices
+  // Fetch devices - initial load only, real-time updates handled by DeviceGrid subscriptions
   const { data, loading, error } = useQuery<GetDevicesData>(GET_DEVICES, {
     variables: { limit: 100 },
     errorPolicy: 'all',
   });
 
-  // Subscribe to real-time updates
-  useSubscription<TemperatureUpdateData>(TEMPERATURE_UPDATES, {
-    skip: false,
-    onData: ({ data }) => {
-      console.log('📡 MapView: Temperature update received:', data);
-
-      if (data?.data?.temperatureUpdates) {
-        const tempUpdate = data.data.temperatureUpdates;
-        console.log(
-          '🌡️ MapView: Processing temperature update for device:',
-          tempUpdate.deviceId,
-          'Status:',
-          tempUpdate.status,
-          'Temp:',
-          tempUpdate.temperature
-        );
-
-        // Update only the specific device's latest reading
-        setDevices((prevDevices) => {
-          const updatedDevices = prevDevices.map((device) => {
-            if (device.id === tempUpdate.deviceId) {
-              console.log(
-                '🔄 MapView: Updating device',
-                device.name,
-                'from',
-                device.latestReading?.status,
-                'to',
-                tempUpdate.status
-              );
-              return {
-                ...device,
-                latestReading: {
-                  temperature: tempUpdate.temperature,
-                  status: tempUpdate.status,
-                  timestamp: tempUpdate.timestamp,
-                },
-              };
-            }
-            return device;
-          });
-          console.log(
-            '📊 MapView: Updated devices array, devices with critical status:',
-            updatedDevices.filter((d) => d.latestReading?.status === 'CRITICAL')
-              .length
-          );
-          return updatedDevices;
-        });
-      }
-    },
-  });
-
-  // Subscribe to device status changes
-  useSubscription<DeviceStatusChangedData>(DEVICE_STATUS_CHANGED, {
-    skip: false,
-    onData: ({ data }) => {
-      console.log('📡 MapView: Device status change received:', data);
-
-      if (data?.data?.deviceStatusChanged) {
-        const updatedDevice = data.data.deviceStatusChanged;
-        console.log(
-          `🔄 MapView: Updating device ${updatedDevice.name} status to ${updatedDevice.status}`
-        );
-
-        // Update only the specific device in local state
-        setDevices((prevDevices) => {
-          const newDevices = prevDevices.map((device) => {
-            if (device.id === updatedDevice.id) {
-              // Preserve the latestReading from temperature updates
-              const preservedLatestReading = device.latestReading;
-              const mergedDevice = { ...device, ...updatedDevice };
-
-              // If we have a preserved latestReading, use it instead of the one from updatedDevice
-              if (preservedLatestReading) {
-                mergedDevice.latestReading = preservedLatestReading;
-              }
-
-              console.log(
-                `🔄 MapView: Merging device ${updatedDevice.name} status to ${updatedDevice.status}, preserving latestReading:`,
-                preservedLatestReading
-              );
-
-              return mergedDevice;
-            }
-            return device;
-          });
-          console.log(
-            `📊 MapView: Updated devices array, changed device found: ${newDevices.some(
-              (d) => d.id === updatedDevice.id
-            )}`
-          );
-          return newDevices;
-        });
-      }
-    },
-  });
-
-  // Update devices when query data changes, but preserve any newer latestReading
+  // Sync initial data with store
   useEffect(() => {
     if (data?.getDevices) {
-      setDevices((prev) => {
-        if (prev.length === 0) return data.getDevices;
-
-        const prevById = new Map(prev.map((d) => [d.id, d] as const));
-        return data.getDevices.map((incoming) => {
-          const existing = prevById.get(incoming.id);
-          if (!existing) return incoming;
-
-          const existingReading = existing.latestReading;
-          const incomingReading = incoming.latestReading;
-
-          // Decide which latestReading to keep (prefer the newer timestamp if both exist)
-          let mergedLatestReading = incomingReading;
-          if (existingReading) {
-            if (
-              !incomingReading ||
-              new Date(existingReading.timestamp).getTime() >=
-                new Date(incomingReading.timestamp).getTime()
-            ) {
-              mergedLatestReading = existingReading;
-            }
-          }
-
-          const merged: Device = { ...incoming } as Device;
-          if (mergedLatestReading) {
-            // Only set latestReading when we have a value to avoid setting undefined
-            (merged as any).latestReading = mergedLatestReading;
-          }
-          return merged;
-        });
-      });
+      // Only update store if it's empty or we have fresher data
+      if (devices.length === 0) {
+        setDevices(data.getDevices);
+      }
     }
-  }, [data]);
+  }, [data, devices.length, setDevices]);
 
   // Handle client-side mounting
   useEffect(() => {

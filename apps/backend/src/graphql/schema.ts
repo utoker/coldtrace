@@ -47,7 +47,7 @@ export const typeDefs = gql`
     takeDeviceOffline(deviceId: ID): SimulatorResult!
     simulatePowerOutage: SimulatorResult!
     simulateBatchArrival: SimulatorResult!
-    returnToNormal: SimulatorResult!
+    returnToNormal(deviceId: ID): SimulatorResult!
     rechargeBattery(deviceId: ID): SimulatorResult!
     getSimulatorStats: SimulatorStats!
 

@@ -580,9 +580,9 @@ export const resolvers = {
       }
     },
 
-    returnToNormal: async () => {
+    returnToNormal: async (_parent: unknown, args: { deviceId?: string }) => {
       try {
-        return await simulatorService.returnToNormal();
+        return await simulatorService.returnToNormal(args.deviceId);
       } catch (error) {
         console.error('Error returning to normal:', error);
         throw new GraphQLError('Failed to return to normal');

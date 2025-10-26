@@ -1,4 +1,6 @@
 export function Footer() {
+  const currentYear = new Date().getFullYear();
+
   return (
     <footer className="bg-gradient-to-t from-gray-50 to-white border-t border-gray-100 mt-24">
       <div className="max-w-7xl mx-auto px-6 py-16">
@@ -50,7 +52,8 @@ export function Footer() {
 
         <div className="mt-16 pt-8 border-t border-gray-200 text-center">
           <p className="text-gray-500 font-light">
-            © 2024 ColdTrace. Professional cold chain monitoring solution.
+            © {currentYear} ColdTrace. Professional cold chain monitoring
+            solution.
           </p>
         </div>
       </div>
