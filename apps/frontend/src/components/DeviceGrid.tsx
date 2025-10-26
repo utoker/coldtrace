@@ -122,7 +122,6 @@ export function DeviceGrid() {
   );
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const [wsConnected, setWsConnected] = useState(false);
   const [subscriptionErrors, setSubscriptionErrors] = useState<number>(0);
 
@@ -146,7 +145,6 @@ export function DeviceGrid() {
   // Optimized state update function with useCallback
   const updateDeviceWithFlash = useCallback((deviceId: string) => {
     setUpdatingDevices((prev) => new Set(prev).add(deviceId));
-    setLastUpdate(new Date());
 
     setTimeout(() => {
       setUpdatingDevices((prev) => {
@@ -199,7 +197,6 @@ export function DeviceGrid() {
     if ((data as GetDevicesData)?.getDevices) {
       const devices = (data as GetDevicesData).getDevices;
       setDevices(devices);
-      setLastUpdate(new Date()); // Update timestamp when new data is loaded
     }
   }, [data, setDevices]);
 

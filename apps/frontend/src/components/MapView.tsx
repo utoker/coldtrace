@@ -7,7 +7,7 @@ import dynamic from 'next/dynamic';
 import { DeviceDetailModal } from './DeviceDetailModal';
 import { MapPin, Loader2 } from 'lucide-react';
 import { Card, CardContent } from './ui/card';
-import { useDeviceStore } from '@/store/useDeviceStore';
+import { useDeviceStore, Device } from '@/store/useDeviceStore';
 
 // Dynamically import the entire map component to avoid SSR issues
 const DynamicMap = dynamic(() => import('./MapComponent'), {
@@ -23,24 +23,6 @@ const DynamicMap = dynamic(() => import('./MapComponent'), {
     </Card>
   ),
 });
-
-// Types
-interface Device {
-  id: string;
-  deviceId: string;
-  name: string;
-  location: string;
-  latitude?: number;
-  longitude?: number;
-  battery: number;
-  status: 'ONLINE' | 'OFFLINE' | 'MAINTENANCE';
-  isActive: boolean;
-  latestReading?: {
-    temperature: number;
-    status: 'NORMAL' | 'WARNING' | 'CRITICAL';
-    timestamp: string;
-  };
-}
 
 interface GetDevicesData {
   getDevices: Device[];

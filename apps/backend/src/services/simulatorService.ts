@@ -663,11 +663,15 @@ class SimulatorService {
 
       // Temperature updates are already published by the createReading resolver
 
+      // Build success message
+      const deviceName = devicesToReset[0]?.name || 'Device';
+      const message = deviceId
+        ? `${deviceName} returned to normal operation`
+        : `${devicesToReset.length} devices returned to normal operation`;
+
       return {
         success: true,
-        message: deviceId
-          ? `${devicesToReset[0].name} returned to normal operation`
-          : `${devicesToReset.length} devices returned to normal operation`,
+        message,
         affectedDevices: updatedDevices,
       };
     } catch (error) {

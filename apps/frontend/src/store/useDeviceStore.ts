@@ -10,6 +10,8 @@ export interface Device {
   deviceId: string
   name: string
   location: string
+  latitude?: number
+  longitude?: number
   battery: number
   status: 'ONLINE' | 'OFFLINE' | 'MAINTENANCE'
   isActive: boolean

@@ -193,6 +193,11 @@ export type MutationResolveAlertArgs = {
 };
 
 
+export type MutationReturnToNormalArgs = {
+  deviceId?: InputMaybe<Scalars['ID']['input']>;
+};
+
+
 export type MutationSimulateLowBatteryArgs = {
   deviceId?: InputMaybe<Scalars['ID']['input']>;
 };
@@ -596,7 +601,7 @@ export type MutationResolvers<ContextType = GraphQLContext, ParentType extends R
   markMultipleAlertsAsRead?: Resolver<ResolversTypes['BulkUpdateResult'], ParentType, ContextType, RequireFields<MutationMarkMultipleAlertsAsReadArgs, 'ids'>>;
   rechargeBattery?: Resolver<ResolversTypes['SimulatorResult'], ParentType, ContextType, Partial<MutationRechargeBatteryArgs>>;
   resolveAlert?: Resolver<ResolversTypes['Alert'], ParentType, ContextType, RequireFields<MutationResolveAlertArgs, 'id'>>;
-  returnToNormal?: Resolver<ResolversTypes['SimulatorResult'], ParentType, ContextType>;
+  returnToNormal?: Resolver<ResolversTypes['SimulatorResult'], ParentType, ContextType, Partial<MutationReturnToNormalArgs>>;
   simulateBatchArrival?: Resolver<ResolversTypes['SimulatorResult'], ParentType, ContextType>;
   simulateLowBattery?: Resolver<ResolversTypes['SimulatorResult'], ParentType, ContextType, Partial<MutationSimulateLowBatteryArgs>>;
   simulatePowerOutage?: Resolver<ResolversTypes['SimulatorResult'], ParentType, ContextType>;
