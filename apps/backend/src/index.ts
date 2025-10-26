@@ -28,7 +28,7 @@ const SERVER_CONFIG = {
 
 async function startServer() {
   const { PORT, ALLOWED_ORIGINS } = SERVER_CONFIG;
-  
+
   // Debug: Log allowed origins
   console.log('🔧 Allowed origins:', ALLOWED_ORIGINS);
 
@@ -55,10 +55,14 @@ async function startServer() {
       const isAllowed = origin
         ? ALLOWED_ORIGINS.includes(origin)
         : process.env.NODE_ENV !== 'production';
-      
+
       // Enhanced debugging for origin validation
-      console.log(`🔌 WebSocket origin check: "${origin}" in [${ALLOWED_ORIGINS.join(', ')}] = ${isAllowed}`);
-      
+      console.log(
+        `🔌 WebSocket origin check: "${origin}" in [${ALLOWED_ORIGINS.join(
+          ', '
+        )}] = ${isAllowed}`
+      );
+
       if (!isAllowed) {
         console.log(
           `🔌 WebSocket connection rejected from origin: ${origin || 'unknown'}`
@@ -145,14 +149,18 @@ async function startServer() {
           console.log('🌐 CORS: Allowing request without origin');
           return callback(null, true);
         }
-        
+
         const isAllowed = ALLOWED_ORIGINS.includes(origin);
-        console.log(`🌐 CORS origin check: "${origin}" in [${ALLOWED_ORIGINS.join(', ')}] = ${isAllowed}`);
-        
+        console.log(
+          `🌐 CORS origin check: "${origin}" in [${ALLOWED_ORIGINS.join(
+            ', '
+          )}] = ${isAllowed}`
+        );
+
         if (isAllowed) {
           return callback(null, true);
         }
-        
+
         console.log(`🌐 CORS: Rejecting origin: ${origin}`);
         // Deny with no error to avoid opaque network failures in browsers
         return callback(null, false);
@@ -166,9 +174,32 @@ async function startServer() {
     })
   );
 
-  // Health check endpoint
-  app.get('/health', (_req: Request, res: Response) => {
-    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  // Health check endpoint with optional database check
+  app.get('/health', async (req: Request, res: Response) => {
+    const checkDb = req.query.db === 'true';
+
+    const healthStatus: any = {
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      service: 'coldtrace-backend',
+    };
+
+    // Optional database connectivity check
+    if (checkDb) {
+      try {
+        const context = await createContext();
+        // Simple query to verify database is responsive
+        await context.prisma.$queryRaw`SELECT 1 as health_check`;
+        healthStatus.database = 'connected';
+      } catch (error) {
+        healthStatus.database = 'error';
+        healthStatus.status = 'degraded';
+        healthStatus.error =
+          error instanceof Error ? error.message : 'Unknown error';
+      }
+    }
+
+    res.json(healthStatus);
   });
 
   // Start server

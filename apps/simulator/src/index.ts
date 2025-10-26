@@ -97,19 +97,39 @@ class VaccineSimulator {
       startTime: new Date(),
     };
 
-    // Configure Apollo Client
+    // Configure Apollo Client with increased timeout for Railway cold starts
+    // Create a custom fetch with timeout
+    const fetchWithTimeout: typeof fetch = async (input, options = {}) => {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
+
+      try {
+        const response = await fetch(input, {
+          ...options,
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+        return response;
+      } catch (error) {
+        clearTimeout(timeoutId);
+        throw error;
+      }
+    };
+
     this.client = new ApolloClient({
       link: new HttpLink({
         uri: process.env.GRAPHQL_ENDPOINT || 'http://localhost:4000/graphql',
-        fetch,
+        fetch: fetchWithTimeout,
       }),
       cache: new InMemoryCache(),
       defaultOptions: {
         watchQuery: {
           errorPolicy: 'all',
+          fetchPolicy: 'network-only',
         },
         query: {
           errorPolicy: 'all',
+          fetchPolicy: 'network-only',
         },
         mutate: {
           errorPolicy: 'all',
@@ -176,50 +196,89 @@ class VaccineSimulator {
   private async loadDevicesFromBackend(): Promise<void> {
     console.log(chalk.blue('📡 Fetching devices from GraphQL backend...'));
 
-    try {
-      const result = await this.client.query<{ getDevices: Device[] }>({
-        query: this.GET_DEVICES,
-        fetchPolicy: 'network-only', // Always fetch fresh data
-      });
+    // Retry logic for Railway cold start (database may be sleeping)
+    const maxRetries = 3;
+    const retryDelays = [5000, 10000, 15000]; // 5s, 10s, 15s
 
-      if (result.data?.getDevices) {
-        const devices = result.data.getDevices as Device[];
-
-        devices.forEach((device) => {
-          const isMobile = this.isMobileDevice(device);
-          this.devices.set(device.id, {
-            ...device,
-            battery: device.battery, // Use actual battery from database
-            isOnline: device.status === 'ONLINE',
-            lastReadingTime: new Date(),
-            // Production fields
-            isMobile,
-            targetTemperature: 5.0, // Default vaccine storage temperature
-          });
-        });
-
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
         console.log(
-          chalk.green(`✅ Fetched ${devices.length} devices from database`)
+          chalk.gray(
+            `   Attempt ${attempt}/${maxRetries}${
+              attempt > 1 ? ' (database may be waking up...)' : ''
+            }`
+          )
         );
 
-        // Display loaded devices
-        devices.forEach((device) => {
-          const deviceType = this.isMobileDevice(device) ? '🚛' : '🏥';
-          console.log(
-            chalk.gray(
-              `  ${deviceType} ${device.name} (${device.location}) - `
-            ) +
-              chalk.cyan(`${device.minTemp}°C to ${device.maxTemp}°C, `) +
-              chalk.yellow(`${device.battery.toFixed(1)}% battery`)
-          );
+        const result = await this.client.query<{ getDevices: Device[] }>({
+          query: this.GET_DEVICES,
+          fetchPolicy: 'network-only', // Always fetch fresh data
         });
-        console.log();
-      } else {
-        throw new Error('No devices returned from backend');
+
+        if (result.data?.getDevices) {
+          const devices = result.data.getDevices as Device[];
+
+          if (devices.length === 0) {
+            throw new Error(
+              'Query succeeded but no devices found in database. Please ensure devices are seeded.'
+            );
+          }
+
+          devices.forEach((device) => {
+            const isMobile = this.isMobileDevice(device);
+            this.devices.set(device.id, {
+              ...device,
+              battery: device.battery, // Use actual battery from database
+              isOnline: device.status === 'ONLINE',
+              lastReadingTime: new Date(),
+              // Production fields
+              isMobile,
+              targetTemperature: 5.0, // Default vaccine storage temperature
+            });
+          });
+
+          console.log(
+            chalk.green(`✅ Fetched ${devices.length} devices from database`)
+          );
+
+          // Display loaded devices
+          devices.forEach((device) => {
+            const deviceType = this.isMobileDevice(device) ? '🚛' : '🏥';
+            console.log(
+              chalk.gray(
+                `  ${deviceType} ${device.name} (${device.location}) - `
+              ) +
+                chalk.cyan(`${device.minTemp}°C to ${device.maxTemp}°C, `) +
+                chalk.yellow(`${device.battery.toFixed(1)}% battery`)
+            );
+          });
+          console.log();
+          return; // Success, exit retry loop
+        } else {
+          throw new Error('No devices data in GraphQL response');
+        }
+      } catch (error) {
+        const isLastAttempt = attempt === maxRetries;
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+
+        if (isLastAttempt) {
+          console.error(
+            chalk.red(
+              `❌ Failed to load devices after ${maxRetries} attempts:`
+            ),
+            errorMessage
+          );
+          throw error;
+        }
+
+        console.warn(
+          chalk.yellow(`⚠️  Attempt ${attempt} failed: ${errorMessage}`)
+        );
+        const delay = retryDelays[attempt - 1] || 10000;
+        console.log(chalk.gray(`   Retrying in ${delay / 1000} seconds...`));
+        await new Promise((resolve) => setTimeout(resolve, delay));
       }
-    } catch (error) {
-      console.error(chalk.red('❌ Failed to load devices:'), error);
-      throw error;
     }
   }
 

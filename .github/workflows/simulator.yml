@@ -38,9 +38,30 @@ jobs:
             https://coldtracebackend-production.up.railway.app/graphql
           echo "Railway backend GraphQL endpoint test completed"
 
+      - name: Wake up Railway database
+        run: |
+          echo "🔄 Waking up Railway Postgres database..."
+          for i in 1 2 3; do
+            echo "⏳ Attempt $i of 3..."
+            if curl -X POST -H "Content-Type: application/json" \
+              --max-time 30 \
+              --retry 2 \
+              --retry-delay 5 \
+              --data '{ "query": "{ getDevices { id name } }" }' \
+              https://coldtracebackend-production.up.railway.app/graphql 2>&1 | grep -q "data"; then
+              echo "✅ Database is awake and responding with data"
+              exit 0
+            fi
+            if [ $i -lt 3 ]; then
+              echo "⏳ Database not ready, waiting 15 seconds before retry..."
+              sleep 15
+            fi
+          done
+          echo "❌ Failed to wake database after 3 attempts"
+          exit 1
+
       - name: Run simulator
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
           GRAPHQL_ENDPOINT: https://coldtracebackend-production.up.railway.app/graphql
           SIM_INTERVAL_MINUTES: 120
           SIM_RUN_ONCE: true

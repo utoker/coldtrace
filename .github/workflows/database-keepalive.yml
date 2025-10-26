@@ -1,0 +1,33 @@
+name: Database Keep-Alive
+
+on:
+  schedule:
+    # Run every 20 minutes to keep Railway database awake
+    - cron: '*/20 * * * *'
+  workflow_dispatch: # Allow manual triggers
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2 # Should complete quickly
+
+    steps:
+      - name: Ping Railway Database
+        run: |
+          echo "🏓 Pinging Railway backend to keep database awake..."
+          response=$(curl -s --max-time 15 \
+            https://coldtracebackend-production.up.railway.app/health?db=true)
+
+          echo "Response: $response"
+
+          if echo "$response" | grep -q '"database":"connected"'; then
+            echo "✅ Database is responsive and connected"
+            exit 0
+          elif echo "$response" | grep -q '"status":"ok"'; then
+            echo "⚠️ Backend is up but database check may have issues"
+            echo "Keeping workflow successful to avoid alert fatigue"
+            exit 0
+          else
+            echo "⚠️ Unexpected response, but keeping workflow successful"
+            exit 0
+          fi

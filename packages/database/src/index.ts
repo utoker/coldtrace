@@ -7,14 +7,34 @@ const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
 
-export const prisma =
-  globalForPrisma.prisma ??
-  new PrismaClient({
-    log:
-      process.env.NODE_ENV === 'development'
-        ? ['error', 'warn'] // Removed 'query' to reduce console noise
-        : ['error'],
-  });
+// Build Prisma client configuration
+const prismaConfig: any = {
+  log:
+    process.env.NODE_ENV === 'development'
+      ? ['error', 'warn'] // Removed 'query' to reduce console noise
+      : ['error'],
+};
+
+// Add datasource URL with connection pooling for production (Railway cold starts)
+if (process.env.DATABASE_URL) {
+  if (process.env.NODE_ENV === 'production') {
+    // Add connection pool settings for production
+    const separator = process.env.DATABASE_URL.includes('?') ? '&' : '?';
+    prismaConfig.datasources = {
+      db: {
+        url: `${process.env.DATABASE_URL}${separator}connection_limit=10&pool_timeout=30`,
+      },
+    };
+  } else {
+    prismaConfig.datasources = {
+      db: {
+        url: process.env.DATABASE_URL,
+      },
+    };
+  }
+}
+
+export const prisma = globalForPrisma.prisma ?? new PrismaClient(prismaConfig);
 
 if (process.env.NODE_ENV !== 'production') {
   globalForPrisma.prisma = prisma;
