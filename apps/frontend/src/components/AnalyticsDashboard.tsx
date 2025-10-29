@@ -74,6 +74,15 @@ const GET_ANALYTICS_DATA = gql`
         CONNECTION_LOST
       }
     }
+    getAlerts(limit: 1000) {
+      id
+      deviceId
+      type
+      severity
+      isResolved
+      createdAt
+      resolvedAt
+    }
   }
 `;
 
@@ -141,9 +150,20 @@ interface AlertStats {
   };
 }
 
+interface Alert {
+  id: string;
+  deviceId: string;
+  type: string;
+  severity: string;
+  isResolved: boolean;
+  createdAt: string;
+  resolvedAt?: string;
+}
+
 interface AnalyticsData {
   getDevices: Device[];
   getAlertStats: AlertStats;
+  getAlerts: Alert[];
 }
 
 export function AnalyticsDashboard() {
@@ -255,6 +275,7 @@ export function AnalyticsDashboard() {
   }
 
   const devices = data?.getDevices || [];
+  const alerts = data?.getAlerts || [];
   const alertStats = data?.getAlertStats || {
     total: 0,
     unread: 0,
@@ -734,6 +755,7 @@ export function AnalyticsDashboard() {
             devices={devices}
             selectedDevice={selectedDevice}
             dateRange={dateRange as any}
+            alerts={alerts}
           />
         </TabsContent>
       </Tabs>

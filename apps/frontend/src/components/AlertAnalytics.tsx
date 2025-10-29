@@ -70,11 +70,22 @@ interface AlertStats {
   };
 }
 
+interface Alert {
+  id: string;
+  deviceId: string;
+  type: string;
+  severity: string;
+  isResolved: boolean;
+  createdAt: string;
+  resolvedAt?: string;
+}
+
 interface AlertAnalyticsProps {
   alertStats: AlertStats;
   devices: Device[];
   selectedDevice: string;
   dateRange?: { from: Date; to: Date };
+  alerts?: Alert[];
 }
 
 export function AlertAnalytics({
@@ -82,6 +93,7 @@ export function AlertAnalytics({
   devices,
   selectedDevice,
   dateRange,
+  alerts = [],
 }: AlertAnalyticsProps) {
   const filteredDevices = useMemo(() => {
     if (selectedDevice === 'all') return devices;
@@ -216,7 +228,7 @@ export function AlertAnalytics({
   }, [filteredDevices, dateRange]);
 
   const alertTrendData = useMemo(() => {
-    // Use real data from readings with date filtering
+    // Use real alert data instead of readings
     const trendData: Array<{
       date: string;
       alerts: number;
@@ -224,52 +236,45 @@ export function AlertAnalytics({
       critical: number;
     }> = [];
 
-    // Group readings by date
-    const readingsByDate = new Map<
-      string,
-      Array<{
-        status: string;
-        timestamp: string;
-      }>
-    >();
+    // Filter alerts by device and date range
+    let filteredAlerts = alerts;
 
-    filteredDevices.forEach((device) => {
-      device.readings.forEach((reading) => {
-        const readingDate = new Date(reading.timestamp);
+    if (selectedDevice !== 'all') {
+      filteredAlerts = alerts.filter((a) => a.deviceId === selectedDevice);
+    }
 
-        // Apply date range filter if provided
-        if (dateRange) {
-          const { from, to } = dateRange;
-          if (readingDate < from || readingDate > to) {
-            return; // Skip this reading if it's outside the date range
-          }
-        }
-
-        const dateKey = readingDate.toLocaleDateString();
-        if (!readingsByDate.has(dateKey)) {
-          readingsByDate.set(dateKey, []);
-        }
-        readingsByDate.get(dateKey)!.push(reading);
+    if (dateRange) {
+      filteredAlerts = filteredAlerts.filter((alert) => {
+        const alertDate = new Date(alert.createdAt);
+        return alertDate >= dateRange.from && alertDate <= dateRange.to;
       });
+    }
+
+    // Group alerts by date
+    const alertsByDate = new Map<string, Alert[]>();
+
+    filteredAlerts.forEach((alert) => {
+      const alertDate = new Date(alert.createdAt);
+      const dateKey = alertDate.toLocaleDateString();
+
+      if (!alertsByDate.has(dateKey)) {
+        alertsByDate.set(dateKey, []);
+      }
+      alertsByDate.get(dateKey)!.push(alert);
     });
 
-    // Calculate alert metrics for each date
-    readingsByDate.forEach((readings, date) => {
-      const warningCount = readings.filter(
-        (r) => r.status === 'WARNING'
+    // Calculate metrics for each date
+    alertsByDate.forEach((dayAlerts, date) => {
+      const totalAlerts = dayAlerts.length;
+      const criticalCount = dayAlerts.filter(
+        (a) => a.severity === 'CRITICAL'
       ).length;
-      const criticalCount = readings.filter(
-        (r) => r.status === 'CRITICAL'
-      ).length;
-      const totalAlerts = warningCount + criticalCount;
-
-      // Assume 80% resolution rate for demo purposes
-      const resolved = Math.floor(totalAlerts * 0.8);
+      const resolvedCount = dayAlerts.filter((a) => a.isResolved).length;
 
       trendData.push({
         date,
         alerts: totalAlerts,
-        resolved,
+        resolved: resolvedCount,
         critical: criticalCount,
       });
     });
@@ -277,7 +282,7 @@ export function AlertAnalytics({
     return trendData.sort(
       (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
     );
-  }, [filteredDevices, dateRange]);
+  }, [alerts, selectedDevice, dateRange]);
 
   return (
     <div className="space-y-6">

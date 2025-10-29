@@ -20,8 +20,8 @@ export default function Home() {
               ColdTrace
             </h1>
             <p className="text-xl sm:text-2xl font-light text-gray-600 max-w-3xl mx-auto leading-relaxed">
-              Real-time vaccine cold chain monitoring dashboard with live device tracking,
-              simulated IoT sensors, and interactive scenario controls
+              Real-time vaccine cold chain monitoring dashboard with live device
+              tracking, simulated IoT sensors, and interactive scenario controls
             </p>
           </div>
         </div>

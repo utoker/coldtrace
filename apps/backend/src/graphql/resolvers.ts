@@ -454,6 +454,13 @@ export const resolvers = {
           },
         });
 
+        // Update device's battery level to match the reading
+        // This ensures the next simulator run picks up the correct battery level
+        await context.prisma.device.update({
+          where: { id: input.deviceId },
+          data: { battery: input.battery },
+        });
+
         // Create reading with status (this would be added to the reading data if we had status field in DB)
         const readingWithStatus = {
           ...reading,
