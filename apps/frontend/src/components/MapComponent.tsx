@@ -426,7 +426,7 @@ const MapComponent = memo(
                         <span style="font-weight: 500; color: ${
                           device.battery > 20 ? '#059669' : '#dc2626'
                         };">
-                          ${device.battery}%
+                          ${device.battery.toFixed(1)}%
                         </span>
                       </div>
                     </div>
