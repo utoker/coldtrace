@@ -2,8 +2,8 @@ name: Database Keep-Alive
 
 on:
   schedule:
-    # Run every 20 minutes to keep Railway database awake
-    - cron: '*/20 * * * *'
+    # Run every 10 minutes to keep Railway database awake
+    - cron: '*/10 * * * *'
   workflow_dispatch: # Allow manual triggers
 
 jobs:
