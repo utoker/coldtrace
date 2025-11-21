@@ -98,7 +98,7 @@ ColdTrace is a full-stack cold chain monitoring platform designed to track vacci
 1. **Clone the repository**
 
    ```bash
-   git clone https://github.com/yourusername/coldtrace.git
+   git clone https://github.com/utoker/coldtrace.git
    cd coldtrace
    ```
 
@@ -590,11 +590,11 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 👤 Author
 
-**Your Name**
+**Umut Toker**
 
-- Portfolio: [yourwebsite.com](https://yourwebsite.com)
-- LinkedIn: [linkedin.com/in/yourprofile](https://linkedin.com/in/yourprofile)
-- GitHub: [@yourusername](https://github.com/yourusername)
+- Portfolio: [utoker.com](https://utoker.com)
+- LinkedIn: [linkedin.com/in/utoker](https://linkedin.com/in/utoker)
+- GitHub: [@utoker](https://github.com/utoker)
 
 ## 🙏 Acknowledgments
 
