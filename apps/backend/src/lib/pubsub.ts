@@ -2,6 +2,8 @@ import { RedisPubSub } from 'graphql-redis-subscriptions';
 import Redis from 'ioredis';
 
 // Redis connection configuration
+// Note: With exactOptionalPropertyTypes, we must omit optional props when undefined
+// rather than setting them to undefined. Use conditional spread to include them only when set.
 const getRedisOptions = () => {
   const redisUrl = process.env.REDIS_URL;
 
@@ -10,18 +12,17 @@ const getRedisOptions = () => {
     try {
       // Parse Redis URL format: redis://[:password@]host[:port][/db-number]
       const url = new URL(redisUrl);
-      return {
+      const base = {
         host: url.hostname,
         port: parseInt(url.port || '6379'),
-        password: url.password || undefined,
-        // Use TLS if rediss:// protocol
-        tls: url.protocol === 'rediss:' ? {} : undefined,
-        retryStrategy: (times: number) => {
-          const delay = Math.min(times * 50, 2000);
-          return delay;
-        },
+        retryStrategy: (times: number) => Math.min(times * 50, 2000),
         maxRetriesPerRequest: 3,
         lazyConnect: true,
+      };
+      return {
+        ...base,
+        ...(url.password ? { password: url.password } : {}),
+        ...(url.protocol === 'rediss:' ? { tls: {} as object } : {}),
       };
     } catch (error) {
       console.warn('Failed to parse REDIS_URL, using fallback config:', error);
@@ -29,16 +30,17 @@ const getRedisOptions = () => {
   }
 
   // Fallback to separate environment variables or localhost
-  return {
+  const base = {
     host: process.env.REDIS_HOST || 'localhost',
     port: parseInt(process.env.REDIS_PORT || '6379'),
-    password: process.env.REDIS_PASSWORD || undefined,
-    retryStrategy: (times: number) => {
-      const delay = Math.min(times * 50, 2000);
-      return delay;
-    },
+    retryStrategy: (times: number) => Math.min(times * 50, 2000),
     maxRetriesPerRequest: 3,
     lazyConnect: true,
+  };
+  const pwd = process.env.REDIS_PASSWORD;
+  return {
+    ...base,
+    ...(pwd ? { password: pwd } : {}),
   };
 };
 
