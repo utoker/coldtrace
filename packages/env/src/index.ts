@@ -22,6 +22,11 @@ const developmentSchema = z.object({
   NEXT_PUBLIC_FRONTEND_URL: z.string().url().optional(),
   // Comma-separated list of allowed origins for CORS and WebSocket
   ALLOWED_ORIGINS: z.string().optional(),
+  // Redis configuration (optional - Railway auto-injects REDIS_URL)
+  REDIS_URL: z.string().url().optional(),
+  REDIS_HOST: z.string().optional(),
+  REDIS_PORT: z.coerce.number().optional(),
+  REDIS_PASSWORD: z.string().optional(),
 });
 
 // Production environment schema (lenient requirements for this project)
@@ -39,6 +44,11 @@ const productionSchema = developmentSchema.extend({
   SMTP_PORT: z.coerce.number().optional(),
   SMTP_USER: z.string().optional(),
   SMTP_PASS: z.string().optional(),
+  // Redis configuration (optional - Railway auto-injects REDIS_URL)
+  REDIS_URL: z.string().url().optional(),
+  REDIS_HOST: z.string().optional(),
+  REDIS_PORT: z.coerce.number().optional(),
+  REDIS_PASSWORD: z.string().optional(),
 });
 
 // Select schema based on environment

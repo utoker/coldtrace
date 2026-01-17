@@ -21,6 +21,24 @@ services:
     networks:
       - coldtrace-network
 
+  redis:
+    image: redis:7-alpine
+    container_name: coldtrace-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    networks:
+      - coldtrace-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
   adminer:
     image: adminer:4.8.1
     container_name: coldtrace-adminer
@@ -46,3 +64,6 @@ volumes:
   postgres-data:
     driver: local
     name: coldtrace-postgres-data
+  redis-data:
+    driver: local
+    name: coldtrace-redis-data
