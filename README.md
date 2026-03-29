@@ -12,8 +12,7 @@
 
 ColdTrace is a full-stack cold chain monitoring platform designed to track vaccine storage conditions in real-time. The system simulates IoT temperature sensors deployed across multiple locations, monitors temperature excursions, battery levels, and device connectivity, and provides a comprehensive dashboard for cold chain managers.
 
-**Live Demo:** [View Dashboard](https://coldtrace.vercel.app) _(if deployed)_
-
+**Live Demo:** [View Dashboard](https://coldtrace.app) 
 ### Key Features
 
 - 📊 **Real-time Dashboard** - Live temperature monitoring with interactive maps and device status cards
