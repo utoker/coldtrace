@@ -8,6 +8,9 @@ const inter = Inter({ subsets: ['latin'] })
 export const metadata: Metadata = {
   title: 'ColdTrace',
   description: 'Cold chain monitoring and traceability platform',
+  icons: {
+    icon: '/favicon.svg',
+  },
 }
 
 export default function RootLayout({
