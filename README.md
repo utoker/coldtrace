@@ -267,7 +267,7 @@ NEXT_PUBLIC_GRAPHQL_WS_ENDPOINT="ws://localhost:4000/graphql"
 
 # Simulator
 GRAPHQL_ENDPOINT="http://localhost:4000/graphql"
-SIM_INTERVAL_MINUTES=120
+SIM_INTERVAL_MINUTES=5
 ```
 
 ### Database Management
