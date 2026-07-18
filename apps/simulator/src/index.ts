@@ -57,6 +57,7 @@ class VaccineSimulator {
   private devices: Map<string, DeviceState> = new Map();
   private stats: Stats;
   private intervalId?: NodeJS.Timeout;
+  private refetchIntervalId?: NodeJS.Timeout;
   private isShuttingDown = false;
 
   // GraphQL Queries and Mutations
@@ -154,6 +155,9 @@ class VaccineSimulator {
       if (this.intervalId) {
         clearInterval(this.intervalId);
       }
+      if (this.refetchIntervalId) {
+        clearInterval(this.refetchIntervalId);
+      }
 
       this.displayFinalStats();
       process.exit(0);
@@ -224,18 +228,7 @@ class VaccineSimulator {
             );
           }
 
-          devices.forEach((device) => {
-            const isMobile = this.isMobileDevice(device);
-            this.devices.set(device.id, {
-              ...device,
-              battery: device.battery, // Use actual battery from database
-              isOnline: device.status === 'ONLINE',
-              lastReadingTime: new Date(),
-              // Production fields
-              isMobile,
-              targetTemperature: 5.0, // Default vaccine storage temperature
-            });
-          });
+          this.reconcileDevices(devices);
 
           console.log(
             chalk.green(`✅ Fetched ${devices.length} devices from database`)
@@ -279,6 +272,86 @@ class VaccineSimulator {
         console.log(chalk.gray(`   Retrying in ${delay / 1000} seconds...`));
         await new Promise((resolve) => setTimeout(resolve, delay));
       }
+    }
+  }
+
+  // Merge fresh device rows from the DB into the in-memory Map. On first load
+  // this populates the Map; on later calls it reconciles status/threshold
+  // changes without discarding drift state (battery, lastReadingTime,
+  // targetTemperature). Devices removed from the DB are dropped; new ones are
+  // added. isOnline flips both ways so a device flipped in the UI (via
+  // takeDeviceOffline / returnToNormal / simulateBatchArrival / power-outage)
+  // is picked up on the next refetch.
+  private reconcileDevices(fresh: Device[]): void {
+    const freshIds = new Set<string>();
+    for (const device of fresh) {
+      freshIds.add(device.id);
+      const existing = this.devices.get(device.id);
+      if (existing) {
+        // Update fields that the DB owns; preserve simulator-owned drift state.
+        existing.name = device.name;
+        existing.location = device.location;
+        if (device.latitude !== undefined) existing.latitude = device.latitude;
+        if (device.longitude !== undefined)
+          existing.longitude = device.longitude;
+        existing.minTemp = device.minTemp;
+        existing.maxTemp = device.maxTemp;
+        existing.status = device.status;
+        existing.isOnline = device.status === 'ONLINE';
+        existing.isMobile = this.isMobileDevice(device);
+      } else {
+        this.devices.set(device.id, {
+          ...device,
+          battery: device.battery,
+          isOnline: device.status === 'ONLINE',
+          lastReadingTime: new Date(),
+          isMobile: this.isMobileDevice(device),
+          targetTemperature: 5.0,
+        });
+      }
+    }
+    // Drop any device that no longer exists in the DB.
+    for (const id of this.devices.keys()) {
+      if (!freshIds.has(id)) this.devices.delete(id);
+    }
+  }
+
+  private async refetchDeviceStatus(): Promise<void> {
+    if (this.isShuttingDown) return;
+    try {
+      const result = await this.client.query<{ getDevices: Device[] }>({
+        query: this.GET_DEVICES,
+        fetchPolicy: 'network-only',
+      });
+      const fresh = result.data?.getDevices as Device[] | undefined;
+      if (!fresh || fresh.length === 0) return;
+
+      const before = new Map<string, boolean>();
+      for (const [id, d] of this.devices) before.set(id, d.isOnline);
+
+      this.reconcileDevices(fresh);
+
+      // Log flips so operators can see reconciliation happen.
+      for (const [id, d] of this.devices) {
+        const prev = before.get(id);
+        if (prev === undefined) {
+          console.log(chalk.cyan(`🔄 refetch: added ${d.name} (${d.status})`));
+        } else if (prev !== d.isOnline) {
+          console.log(
+            chalk.cyan(
+              `🔄 refetch: ${d.name} ${prev ? 'ONLINE→OFFLINE' : 'OFFLINE→ONLINE'}`
+            )
+          );
+        }
+      }
+      for (const id of before.keys()) {
+        if (!this.devices.has(id)) {
+          console.log(chalk.cyan(`🔄 refetch: removed device ${id}`));
+        }
+      }
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      console.warn(chalk.yellow(`⚠️  device refetch failed: ${msg}`));
     }
   }
 
@@ -419,6 +492,7 @@ class VaccineSimulator {
 
   private startSimulation(): void {
     const intervalMinutes = Number(process.env.SIM_INTERVAL_MINUTES || 10);
+    const refetchMinutes = Number(process.env.SIM_REFETCH_MINUTES || 5);
     const runOnce = process.env.SIM_RUN_ONCE === 'true';
 
     console.log(chalk.green('🚀 Starting vaccine monitoring simulation...'));
@@ -542,6 +616,21 @@ class VaccineSimulator {
 
     // Schedule interval
     this.intervalId = setInterval(tick, intervalMinutes * 60 * 1000);
+
+    // Periodically refetch device status so status flips in the UI
+    // (takeDeviceOffline / returnToNormal / batch arrival / power outage) are
+    // observed within one refetch interval, in both directions.
+    if (refetchMinutes > 0) {
+      console.log(
+        chalk.blue(
+          `🔄 Refetching device status every ${refetchMinutes} minutes\n`
+        )
+      );
+      this.refetchIntervalId = setInterval(
+        () => void this.refetchDeviceStatus(),
+        refetchMinutes * 60 * 1000
+      );
+    }
   }
 
   private displayFinalStats(): void {
