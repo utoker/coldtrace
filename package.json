@@ -31,7 +31,10 @@
     "simulator:dev": "pnpm --filter @coldtrace/simulator dev",
     "simulator:start": "pnpm --filter @coldtrace/simulator start",
     "simulator:test": "pnpm --filter @coldtrace/simulator test",
-    "simulator:validate": "pnpm --filter @coldtrace/simulator validate"
+    "simulator:validate": "pnpm --filter @coldtrace/simulator validate",
+    "stress:verify": "pnpm --filter @coldtrace/stress-test run verify",
+    "stress:publisher": "pnpm --filter @coldtrace/stress-test run publisher",
+    "stress:subscriber": "pnpm --filter @coldtrace/stress-test run subscriber"
   },
   "devDependencies": {
     "@eslint/js": "^9.34.0",

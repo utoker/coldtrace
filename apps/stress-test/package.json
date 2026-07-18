@@ -1,0 +1,24 @@
+{
+  "name": "@coldtrace/stress-test",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "verify": "tsx src/verify.ts",
+    "publisher": "tsx src/publisher.ts",
+    "subscriber": "tsx src/subscriber.ts",
+    "lint": "eslint src --ext .ts"
+  },
+  "dependencies": {
+    "dotenv": "^16.6.1",
+    "graphql": "^16.11.0",
+    "graphql-ws": "^6.0.6",
+    "ws": "^8.18.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.7",
+    "@types/ws": "^8.5.14",
+    "tsx": "^4.17.0",
+    "typescript": "^5.7.2"
+  }
+}

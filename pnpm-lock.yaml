@@ -327,6 +327,34 @@ importers:
         specifier: ^5.7.2
         version: 5.9.2
 
+  apps/stress-test:
+    dependencies:
+      dotenv:
+        specifier: ^16.6.1
+        version: 16.6.1
+      graphql:
+        specifier: ^16.11.0
+        version: 16.11.0
+      graphql-ws:
+        specifier: ^6.0.6
+        version: 6.0.6(graphql@16.11.0)(ws@8.18.3)
+      ws:
+        specifier: ^8.18.3
+        version: 8.18.3
+    devDependencies:
+      '@types/node':
+        specifier: ^22.10.7
+        version: 22.18.0
+      '@types/ws':
+        specifier: ^8.5.14
+        version: 8.18.1
+      tsx:
+        specifier: ^4.17.0
+        version: 4.20.5
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.2
+
   packages/database:
     dependencies:
       '@coldtrace/env':
