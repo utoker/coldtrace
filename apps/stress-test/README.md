@@ -4,7 +4,7 @@ Verify Redis PubSub and measure real-time update throughput for resume metrics.
 
 ## Prerequisites
 
-- Backend running (local or Railway) with Redis
+- Backend running (local or production, `api.coldtrace.app`) with Redis
 - Database seeded with at least one device: `pnpm db:setup` (includes seed)
 
 ## Quick start (local)
@@ -24,8 +24,8 @@ Confirms subscriptions receive updates after `createReading`:
 # Local
 pnpm stress:verify
 
-# Production (Railway)
-GRAPHQL_HTTP_URL=https://YOUR-BACKEND.up.railway.app/graphql pnpm stress:verify
+# Production
+GRAPHQL_HTTP_URL=https://api.coldtrace.app/graphql pnpm stress:verify
 ```
 
 If `GRAPHQL_WS_URL` is not set, it is derived from `GRAPHQL_HTTP_URL` (http→ws, https→wss).  
@@ -41,7 +41,7 @@ pnpm stress:subscriber
 
 # Production, 60s, 30 clients
 DURATION_SECONDS=60 NUM_SUBSCRIBERS=30 \
-  GRAPHQL_HTTP_URL=https://YOUR-BACKEND.up.railway.app/graphql \
+  GRAPHQL_HTTP_URL=https://api.coldtrace.app/graphql \
   pnpm stress:subscriber
 ```
 
@@ -53,7 +53,7 @@ pnpm stress:publisher
 
 # Production, 30s, 80 concurrent
 DURATION_SECONDS=30 CONCURRENT=80 \
-  GRAPHQL_HTTP_URL=https://YOUR-BACKEND.up.railway.app/graphql \
+  GRAPHQL_HTTP_URL=https://api.coldtrace.app/graphql \
   pnpm stress:publisher
 ```
 
@@ -88,7 +88,7 @@ Use **subscriber’s “Messages/sec”** as “subscription delivery” (messag
    - Latency (avg, p95)
    - Messages/sec and number of subscribers
 2. **One-line note** in a `docs/` or `stress-test/` file, e.g.:
-   - *"Stress test on [date]: createReading throughput X/sec, N subscribers, Y messages/sec. Backend: Railway, Redis PubSub."*
+   - *"Stress test on [date]: createReading throughput X/sec, N subscribers, Y messages/sec. Backend: self-hosted Pi, Redis PubSub."*
 3. In interviews: describe the flow (createReading → Redis PubSub → WebSocket subscribers) and that you ran the included stress-test scripts to get the numbers.
 
 ### Interpreting results
@@ -97,4 +97,4 @@ Use **subscriber’s “Messages/sec”** as “subscription delivery” (messag
 - **Subscriber messages/sec** = `createReading/sec × NUM_SUBSCRIBERS` (each createReading is pushed to every subscriber).
 - For a “10,000+ updates/sec” style claim, use **publisher throughput**; “updates” = new readings. If you have 50 subscribers and 200 createReading/sec, you can also say “10,000 subscription messages/sec” (200×50).
 
-Run against **production (Railway)** for the most realistic numbers; local runs can be higher (no network, shared machine).
+Run against **production (`api.coldtrace.app`)** for the most realistic numbers; local runs can be higher (no network, shared machine).

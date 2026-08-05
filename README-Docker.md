@@ -66,25 +66,24 @@ This guide explains how to set up ColdTrace for local development using Docker.
 - `.env.local` - Local Docker development settings
 - `.env.production.example` - Production template
 
-### Production Environment (Vercel + Render/Railway + Supabase)
+### Production Environment (Vercel + self-hosted Pi)
 
-Set these variables in your deployment platforms:
+Backend, database, and simulator run on a Raspberry Pi (see the `homelab` repo
+for systemd units, Caddy config, and deploy scripts). Frontend is on Vercel.
 
-- Backend (Render/Railway Web Service)
+- Backend (`coldtrace-backend.service` on the Pi)
 
-  - `DATABASE_URL` = Supabase Postgres connection string
-  - `ALLOWED_ORIGINS` = `https://your-frontend.vercel.app,https://www.yourdomain.com`
-  - `PORT` = (optional) service-assigned or `4000`
+  - `DATABASE_URL` = local Postgres connection string
+  - `ALLOWED_ORIGINS` = `https://coldtrace.app`
+  - `PORT` = `4000`
 
 - Frontend (Vercel)
 
-  - `NEXT_PUBLIC_GRAPHQL_ENDPOINT` = `https://<your-backend-domain>/graphql`
-  - `NEXT_PUBLIC_GRAPHQL_WS_ENDPOINT` = `wss://<your-backend-domain>/graphql`
+  - `NEXT_PUBLIC_GRAPHQL_ENDPOINT` = `https://api.coldtrace.app/graphql`
+  - `NEXT_PUBLIC_GRAPHQL_WS_ENDPOINT` = `wss://api.coldtrace.app/graphql`
 
-- Simulator (Render/Railway Worker or Cron)
-  - `GRAPHQL_ENDPOINT` = `https://<your-backend-domain>/graphql`
-  - `SIM_INTERVAL_MINUTES` = `120` (two hours)
-  - `SIM_RUN_ONCE` = `true` (only for cron-based single run)
+- Simulator (`coldtrace-simulator.service` on the Pi, always-on)
+  - `GRAPHQL_ENDPOINT` = `http://localhost:4000/graphql`
 
 ## Architecture
 

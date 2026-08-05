@@ -7,7 +7,7 @@ import Redis from 'ioredis';
 const getRedisOptions = () => {
   const redisUrl = process.env.REDIS_URL;
 
-  // If REDIS_URL is provided (Railway, Upstash, etc.), parse it
+  // If REDIS_URL is provided, parse it
   if (redisUrl) {
     try {
       // Parse Redis URL format: redis://[:password@]host[:port][/db-number]

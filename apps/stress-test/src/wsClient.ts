@@ -1,7 +1,7 @@
 /**
  * WebSocket client that sends an Origin header for backend verifyClient.
  * In production, the backend rejects connections with no Origin; Node's ws
- * doesn't send Origin by default. Use this so stress-test works against Railway.
+ * doesn't send Origin by default. Use this so stress-test works against production.
  */
 import WebSocket from 'ws';
 

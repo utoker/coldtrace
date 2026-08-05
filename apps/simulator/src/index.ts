@@ -98,7 +98,6 @@ class VaccineSimulator {
       startTime: new Date(),
     };
 
-    // Configure Apollo Client with increased timeout for Railway cold starts
     // Create a custom fetch with timeout
     const fetchWithTimeout: typeof fetch = async (input, options = {}) => {
       const controller = new AbortController();
@@ -200,18 +199,13 @@ class VaccineSimulator {
   private async loadDevicesFromBackend(): Promise<void> {
     console.log(chalk.blue('📡 Fetching devices from GraphQL backend...'));
 
-    // Retry logic for Railway cold start (database may be sleeping)
     const maxRetries = 3;
     const retryDelays = [5000, 10000, 15000]; // 5s, 10s, 15s
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         console.log(
-          chalk.gray(
-            `   Attempt ${attempt}/${maxRetries}${
-              attempt > 1 ? ' (database may be waking up...)' : ''
-            }`
-          )
+          chalk.gray(`   Attempt ${attempt}/${maxRetries}`)
         );
 
         const result = await this.client.query<{ getDevices: Device[] }>({

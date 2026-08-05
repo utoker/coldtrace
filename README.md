@@ -421,36 +421,36 @@ This project uses **Turborepo** with **pnpm workspaces** for efficient monorepo 
 
 ### Production Architecture
 
-**Recommended Stack:**
+**Live Stack:**
 
-- **Frontend**: Vercel (Next.js optimized)
-- **Backend**: Railway or Render (Node.js GraphQL server)
-- **Database**: Supabase or Railway (PostgreSQL)
-- **Simulator**: Railway Cron Job or Worker
+- **Frontend**: Vercel (Next.js), auto-deployed from GitHub — `https://coldtrace.app`
+- **Backend**: Self-hosted on a Raspberry Pi (systemd service, behind Caddy + Cloudflare) — `https://api.coldtrace.app`
+- **Database**: PostgreSQL 17 on the Pi
+- **Simulator**: Long-running systemd service on the Pi, writing readings continuously via GraphQL
+
+Deployment orchestration (systemd units, Caddy config, deploy/backup scripts) lives in the separate `homelab` repo.
 
 ### Environment Setup
 
 **Vercel (Frontend)**:
 
 ```bash
-NEXT_PUBLIC_GRAPHQL_ENDPOINT=https://your-backend.railway.app/graphql
-NEXT_PUBLIC_GRAPHQL_WS_ENDPOINT=wss://your-backend.railway.app/graphql
+NEXT_PUBLIC_GRAPHQL_ENDPOINT=https://api.coldtrace.app/graphql
+NEXT_PUBLIC_GRAPHQL_WS_ENDPOINT=wss://api.coldtrace.app/graphql
 ```
 
-**Railway/Render (Backend)**:
+**Pi (Backend)**:
 
 ```bash
-DATABASE_URL=<your-postgresql-connection-string>
-ALLOWED_ORIGINS=https://your-app.vercel.app,https://yourdomain.com
+DATABASE_URL=<postgresql-connection-string>
+ALLOWED_ORIGINS=https://coldtrace.app
 PORT=4000
 ```
 
-**Railway Cron (Simulator)**:
+**Pi (Simulator)**:
 
 ```bash
-GRAPHQL_ENDPOINT=https://your-backend.railway.app/graphql
-SIM_INTERVAL_MINUTES=120
-SIM_RUN_ONCE=true
+GRAPHQL_ENDPOINT=http://localhost:4000/graphql
 ```
 
 ### Build Commands

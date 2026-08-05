@@ -15,7 +15,7 @@ const prismaConfig: any = {
       : ['error'],
 };
 
-// Add datasource URL with connection pooling for production (Railway cold starts)
+// Add datasource URL with connection pooling for production
 if (process.env.DATABASE_URL) {
   if (process.env.NODE_ENV === 'production') {
     // Add connection pool settings for production
