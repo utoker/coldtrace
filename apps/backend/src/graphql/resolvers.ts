@@ -71,6 +71,10 @@ const DateTimeScalar = new GraphQLScalarType({
     if (value instanceof Date) {
       return value.toISOString();
     }
+    // Subscription payloads delivered through Redis arrive with dates as strings
+    if (typeof value === 'string') {
+      return new Date(value).toISOString();
+    }
     throw new Error('Value must be a Date object');
   },
   parseValue(value: unknown) {
