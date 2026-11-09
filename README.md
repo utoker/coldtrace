@@ -12,7 +12,7 @@
 
 ColdTrace is a full-stack cold chain monitoring platform designed to track vaccine storage conditions in real-time. The system simulates IoT temperature sensors deployed across multiple locations, monitors temperature excursions, battery levels, and device connectivity, and provides a comprehensive dashboard for cold chain managers.
 
-**Live Demo:** [View Dashboard](https://coldtrace.app)
+> **Status: Archived.** The hosted demo is no longer running, so the video below shows the system working.
 
 [![ColdTrace demo: a temperature excursion appears live on the map and as an alert](./docs/demo.gif)](https://www.utoker.com/projects/coldtrace)
 
@@ -426,10 +426,10 @@ This project uses **Turborepo** with **pnpm workspaces** for efficient monorepo 
 
 ### Production Architecture
 
-**Live Stack:**
+**Stack while it was live (now retired):**
 
-- **Frontend**: Vercel (Next.js), auto-deployed from GitHub — `https://coldtrace.app`
-- **Backend**: Self-hosted on a Raspberry Pi (systemd service, behind Caddy + Cloudflare) — `https://api.coldtrace.app`
+- **Frontend**: Vercel (Next.js), auto-deployed from GitHub
+- **Backend**: Self-hosted on a Raspberry Pi (systemd service, behind Caddy + Cloudflare)
 - **Database**: PostgreSQL 17 on the Pi
 - **Simulator**: Long-running systemd service on the Pi, writing readings continuously via GraphQL
 
@@ -472,8 +472,6 @@ cd apps/simulator && pnpm install && pnpm build
 ```
 
 ## 🎨 Screenshots
-
-_(Add screenshots here when deployed)_
 
 **Dashboard View:**
 ![Dashboard](./docs/screenshots/dashboard.png)
