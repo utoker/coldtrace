@@ -204,12 +204,9 @@ export function DeviceGrid() {
   useSubscription(TEMPERATURE_UPDATES, {
     skip: false, // Always try to connect - this will trigger WebSocket connection
     onData: ({ data: subscriptionData }) => {
-      if (
-        (subscriptionData as unknown as TemperatureUpdatesData)
-          ?.temperatureUpdates
-      ) {
-        const reading = (subscriptionData as unknown as TemperatureUpdatesData)
-          .temperatureUpdates;
+      const reading = (subscriptionData.data as TemperatureUpdatesData | null)
+        ?.temperatureUpdates;
+      if (reading) {
         const deviceId = reading.device.id;
 
         // Mark WebSocket as working when we receive data
@@ -244,12 +241,9 @@ export function DeviceGrid() {
   useSubscription(DEVICE_STATUS_CHANGED, {
     skip: false, // Always try to connect - this will trigger WebSocket connection
     onData: ({ data: subscriptionData }) => {
-      if (
-        (subscriptionData as unknown as DeviceStatusChangedData)
-          ?.deviceStatusChanged
-      ) {
-        const device = (subscriptionData as unknown as DeviceStatusChangedData)
-          .deviceStatusChanged;
+      const device = (subscriptionData.data as DeviceStatusChangedData | null)
+        ?.deviceStatusChanged;
+      if (device) {
 
         // Mark WebSocket as working when we receive data
         if (!wsConnected) {
